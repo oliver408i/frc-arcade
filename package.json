@@ -1,0 +1,15 @@
+{
+  "name": "frc-arcade",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "three": "^0.181.2",
+    "webgazer": "^3.4.0"
+  },
+  "devDependencies": {
+    "electron": "^39.2.3"
+  }
+}
