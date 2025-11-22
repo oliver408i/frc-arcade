@@ -104,32 +104,32 @@ const AI_DIFFICULTIES = [
   {
     id: 'easy',
     label: 'EASY',
-    moveSpeed: 0.55,
-    rotateSpeedFactor: 0.65,
-    angleThreshold: 0.38,
-    retreatDistance: 3.6,
+    moveSpeed: 0.45,
+    rotateSpeedFactor: 0.55,
+    angleThreshold: 0.5,
+    retreatDistance: 3.2,
     chaseBoostDistance: 9,
-    jitter: 0.35,
+    jitter: 0.55,
   },
   {
     id: 'normal',
     label: 'NORMAL',
-    moveSpeed: 0.85,
-    rotateSpeedFactor: 0.9,
-    angleThreshold: 0.25,
-    retreatDistance: 2.8,
-    chaseBoostDistance: 10.5,
-    jitter: 0.15,
+    moveSpeed: 0.7,
+    rotateSpeedFactor: 0.75,
+    angleThreshold: 0.36,
+    retreatDistance: 2.6,
+    chaseBoostDistance: 10,
+    jitter: 0.45,
   },
   {
     id: 'hard',
     label: 'HARD',
-    moveSpeed: 1,
-    rotateSpeedFactor: 1,
-    angleThreshold: 0.12,
-    retreatDistance: 2.4,
-    chaseBoostDistance: 11.5,
-    jitter: 0,
+    moveSpeed: 0.85,
+    rotateSpeedFactor: 0.85,
+    angleThreshold: 0.28,
+    retreatDistance: 2.3,
+    chaseBoostDistance: 10.5,
+    jitter: 0.25,
   },
 ];
 
@@ -254,6 +254,7 @@ const players = [
     startPosition: new THREE.Vector3(-6, 0, 0),
     startRotation: Math.PI / 2,
     scoreEl: p1ScoreEl,
+    gamepadIndex: 0,
   },
   {
     id: 'P2',
@@ -270,6 +271,7 @@ const players = [
     startPosition: new THREE.Vector3(6, 0, 0),
     startRotation: -Math.PI / 2,
     scoreEl: p2ScoreEl,
+    gamepadIndex: 1,
   },
 ];
 
@@ -297,6 +299,223 @@ function clampToArena(group, radius = ARENA_RADIUS) {
 }
 
 const keys = {};
+
+const MAX_GAMEPADS = 2;
+const GAMEPAD_DEADZONE = 0.25;
+const GAMEPAD_MENU_THRESHOLD = 0.6;
+const GAMEPAD_BUTTONS = {
+  A: 0,
+  B: 1,
+  X: 2,
+  Y: 3,
+  LB: 4,
+  RB: 5,
+  LT: 6,
+  RT: 7,
+  BACK: 8,
+  START: 9,
+  L3: 10,
+  R3: 11,
+  DPAD_UP: 12,
+  DPAD_DOWN: 13,
+  DPAD_LEFT: 14,
+  DPAD_RIGHT: 15,
+};
+
+function createGamepadState() {
+  return {
+    connected: false,
+    index: null,
+    axes: [0, 0, 0, 0],
+    leftStick: { x: 0, y: 0 },
+    rightStick: { x: 0, y: 0 },
+    buttons: [],
+    justPressed: [],
+    justReleased: [],
+    justPressedSet: new Set(),
+    navEvents: { up: false, down: false, left: false, right: false },
+    analogNavState: { up: false, down: false, left: false, right: false },
+  };
+}
+
+const gamepadStates = Array.from({ length: MAX_GAMEPADS }, createGamepadState);
+
+function applyDeadzone(value, deadzone = GAMEPAD_DEADZONE) {
+  return Math.abs(value) < deadzone ? 0 : value;
+}
+
+function resetGamepadState(state) {
+  state.connected = false;
+  state.index = null;
+  state.axes.fill(0);
+  state.leftStick.x = 0;
+  state.leftStick.y = 0;
+  state.rightStick.x = 0;
+  state.rightStick.y = 0;
+  state.buttons.fill(false);
+  state.justPressed.length = 0;
+  state.justReleased.length = 0;
+  state.justPressedSet.clear();
+  state.navEvents.up = false;
+  state.navEvents.down = false;
+  state.navEvents.left = false;
+  state.navEvents.right = false;
+  state.analogNavState.up = false;
+  state.analogNavState.down = false;
+  state.analogNavState.left = false;
+  state.analogNavState.right = false;
+}
+
+function updateGamepadNavEvents(state) {
+  state.navEvents.up = false;
+  state.navEvents.down = false;
+  state.navEvents.left = false;
+  state.navEvents.right = false;
+
+  const analogUp = state.leftStick.y < -GAMEPAD_MENU_THRESHOLD;
+  const analogDown = state.leftStick.y > GAMEPAD_MENU_THRESHOLD;
+  const analogLeft = state.leftStick.x < -GAMEPAD_MENU_THRESHOLD;
+  const analogRight = state.leftStick.x > GAMEPAD_MENU_THRESHOLD;
+
+  if (analogUp) {
+    if (!state.analogNavState.up) state.navEvents.up = true;
+    state.analogNavState.up = true;
+  } else {
+    state.analogNavState.up = false;
+  }
+  if (analogDown) {
+    if (!state.analogNavState.down) state.navEvents.down = true;
+    state.analogNavState.down = true;
+  } else {
+    state.analogNavState.down = false;
+  }
+  if (analogLeft) {
+    if (!state.analogNavState.left) state.navEvents.left = true;
+    state.analogNavState.left = true;
+  } else {
+    state.analogNavState.left = false;
+  }
+  if (analogRight) {
+    if (!state.analogNavState.right) state.navEvents.right = true;
+    state.analogNavState.right = true;
+  } else {
+    state.analogNavState.right = false;
+  }
+
+  if (state.justPressedSet.has(GAMEPAD_BUTTONS.DPAD_UP)) state.navEvents.up = true;
+  if (state.justPressedSet.has(GAMEPAD_BUTTONS.DPAD_DOWN)) state.navEvents.down = true;
+  if (state.justPressedSet.has(GAMEPAD_BUTTONS.DPAD_LEFT)) state.navEvents.left = true;
+  if (state.justPressedSet.has(GAMEPAD_BUTTONS.DPAD_RIGHT)) state.navEvents.right = true;
+}
+
+function updateGamepadState(state, pad) {
+  state.justPressed.length = 0;
+  state.justReleased.length = 0;
+  state.justPressedSet.clear();
+  if (!pad) {
+    resetGamepadState(state);
+    return;
+  }
+  state.connected = true;
+  state.index = pad.index;
+  const buttonCount = pad.buttons.length;
+  if (state.buttons.length < buttonCount) {
+    const startLength = state.buttons.length;
+    state.buttons.length = buttonCount;
+    for (let i = startLength; i < buttonCount; i += 1) {
+      state.buttons[i] = false;
+    }
+  }
+  for (let i = 0; i < buttonCount; i += 1) {
+    const button = pad.buttons[i];
+    const pressed = !!(button && (button.pressed || button.value > 0.5));
+    if (pressed && !state.buttons[i]) {
+      state.justPressed.push(i);
+      state.justPressedSet.add(i);
+    } else if (!pressed && state.buttons[i]) {
+      state.justReleased.push(i);
+    }
+    state.buttons[i] = pressed;
+  }
+  for (let axisIndex = 0; axisIndex < state.axes.length; axisIndex += 1) {
+    const raw = pad.axes[axisIndex] != null ? pad.axes[axisIndex] : 0;
+    state.axes[axisIndex] = applyDeadzone(raw);
+  }
+  state.leftStick.x = state.axes[0] || 0;
+  state.leftStick.y = state.axes[1] || 0;
+  state.rightStick.x = state.axes[2] || 0;
+  state.rightStick.y = state.axes[3] || 0;
+  updateGamepadNavEvents(state);
+}
+
+function updateGamepads() {
+  if (typeof navigator === 'undefined' || !navigator.getGamepads) {
+    gamepadStates.forEach((state) => resetGamepadState(state));
+    return;
+  }
+  const rawPads = navigator.getGamepads();
+  const connectedPads = [];
+  for (let i = 0; i < rawPads.length; i += 1) {
+    if (rawPads[i]) {
+      connectedPads.push(rawPads[i]);
+    }
+  }
+  for (let i = 0; i < MAX_GAMEPADS; i += 1) {
+    updateGamepadState(gamepadStates[i], connectedPads[i] || null);
+  }
+}
+
+function getGamepadState(padIndex) {
+  if (padIndex == null || padIndex < 0 || padIndex >= gamepadStates.length) return null;
+  return gamepadStates[padIndex];
+}
+
+function isGamepadButtonDown(padIndex, buttonIndex) {
+  const state = getGamepadState(padIndex);
+  if (!state || !state.connected) return false;
+  return !!state.buttons[buttonIndex];
+}
+
+function wasGamepadButtonPressed(padIndex, buttonIndex) {
+  const state = getGamepadState(padIndex);
+  if (!state || !state.connected) return false;
+  return state.justPressedSet.has(buttonIndex);
+}
+
+function addGamepadMovementInputJoust(moveInput, padIndex) {
+  const state = getGamepadState(padIndex);
+  if (!state || !state.connected) return;
+  moveInput.x += state.leftStick.x;
+  moveInput.y += state.leftStick.y;
+  if (state.buttons[GAMEPAD_BUTTONS.DPAD_UP]) moveInput.y -= 1;
+  if (state.buttons[GAMEPAD_BUTTONS.DPAD_DOWN]) moveInput.y += 1;
+  if (state.buttons[GAMEPAD_BUTTONS.DPAD_LEFT]) moveInput.x -= 1;
+  if (state.buttons[GAMEPAD_BUTTONS.DPAD_RIGHT]) moveInput.x += 1;
+}
+
+function addGamepadMovementInputGame2(moveInput, padIndex) {
+  const state = getGamepadState(padIndex);
+  if (!state || !state.connected) return;
+  moveInput.x -= state.leftStick.x;
+  moveInput.y -= state.leftStick.y;
+  if (state.buttons[GAMEPAD_BUTTONS.DPAD_UP]) moveInput.y += 1;
+  if (state.buttons[GAMEPAD_BUTTONS.DPAD_DOWN]) moveInput.y -= 1;
+  if (state.buttons[GAMEPAD_BUTTONS.DPAD_LEFT]) moveInput.x += 1;
+  if (state.buttons[GAMEPAD_BUTTONS.DPAD_RIGHT]) moveInput.x -= 1;
+}
+
+function getGamepadRotateInput(padIndex) {
+  const state = getGamepadState(padIndex);
+  if (!state || !state.connected) return 0;
+  let rotate = 0;
+  if (state.buttons[GAMEPAD_BUTTONS.LB]) rotate += 1;
+  if (state.buttons[GAMEPAD_BUTTONS.RB]) rotate -= 1;
+  if (state.rightStick.x !== 0) {
+    rotate -= state.rightStick.x;
+  }
+  rotate = THREE.MathUtils.clamp(rotate, -1, 1);
+  return rotate;
+}
 
 function refreshMenuButtons() {
   menuButtons = Array.from(menuOverlay.querySelectorAll('.menu-panel-content.active button'));
@@ -347,6 +566,23 @@ function moveMenuFocus(direction) {
   if (next !== -1) {
     menuIndex = next;
     applyMenuFocus();
+  }
+}
+
+function handleMenuHorizontalInput(direction) {
+  if (!menuButtons.length) return;
+  const focusedButton = menuButtons[menuIndex];
+  if (!focusedButton) return;
+  const action = focusedButton.dataset.action;
+  if (!action) return;
+  if (
+    action === 'toggle-ai' ||
+    action === 'toggle-game2-ai-driver' ||
+    action === 'toggle-game2-ai-turret'
+  ) {
+    runMenuAction(action);
+  } else if (action === 'cycle-ai-difficulty') {
+    runMenuAction('cycle-ai-difficulty', direction);
   }
 }
 
@@ -462,6 +698,64 @@ function handleMenuNavigation(event) {
     return true;
   }
   return false;
+}
+
+function handleStartMenuGamepadInput(padIndex) {
+  const state = getGamepadState(padIndex);
+  if (!state || !state.connected) return;
+  if (state.navEvents.up) {
+    moveStartMenuSelection(-1);
+  } else if (state.navEvents.down) {
+    moveStartMenuSelection(1);
+  }
+  if (
+    wasGamepadButtonPressed(padIndex, GAMEPAD_BUTTONS.A) ||
+    wasGamepadButtonPressed(padIndex, GAMEPAD_BUTTONS.START)
+  ) {
+    const button = startMenuButtons[startMenuIndex];
+    if (button) {
+      selectGame(button.dataset.game);
+    }
+  }
+}
+
+function handlePauseMenuGamepadInput(padIndex) {
+  const state = getGamepadState(padIndex);
+  if (!state || !state.connected) return;
+  if (state.navEvents.up) moveMenuFocus(-1);
+  if (state.navEvents.down) moveMenuFocus(1);
+  if (state.navEvents.left) handleMenuHorizontalInput(-1);
+  if (state.navEvents.right) handleMenuHorizontalInput(1);
+  if (wasGamepadButtonPressed(padIndex, GAMEPAD_BUTTONS.A)) {
+    activateMenuSelection();
+  }
+  if (wasGamepadButtonPressed(padIndex, GAMEPAD_BUTTONS.B)) {
+    closeMenu();
+  }
+}
+
+function handleGamepadMenus() {
+  let menuToggleHandled = false;
+  for (let i = 0; i < gamepadStates.length; i += 1) {
+    const state = gamepadStates[i];
+    if (!state || !state.connected) continue;
+    if (startMenuVisible) {
+      handleStartMenuGamepadInput(i);
+      continue;
+    }
+    if (menuOpen) {
+      handlePauseMenuGamepadInput(i);
+      if (!menuToggleHandled && wasGamepadButtonPressed(i, GAMEPAD_BUTTONS.START)) {
+        toggleMenu();
+        menuToggleHandled = true;
+      }
+      continue;
+    }
+    if (!menuToggleHandled && wasGamepadButtonPressed(i, GAMEPAD_BUTTONS.START)) {
+      toggleMenu();
+      menuToggleHandled = true;
+    }
+  }
 }
 
 allMenuButtons.forEach((button) => {
@@ -864,6 +1158,13 @@ function highlightStartButton() {
   }
 }
 
+function moveStartMenuSelection(direction) {
+  if (!startMenuButtons.length) return;
+  const length = startMenuButtons.length;
+  startMenuIndex = (startMenuIndex + direction + length) % length;
+  highlightStartButton();
+}
+
 function updateControlHints(mode) {
   if (!controlBlocks.length) return;
   if (mode === 'shooter') {
@@ -887,14 +1188,12 @@ function updateControlHints(mode) {
 function handleStartMenuKeydown(event) {
   const key = event.key.toLowerCase();
   if (key === 'arrowup' || key === 'w') {
-    startMenuIndex = (startMenuIndex - 1 + startMenuButtons.length) % startMenuButtons.length;
-    highlightStartButton();
+    moveStartMenuSelection(-1);
     event.preventDefault();
     return true;
   }
   if (key === 'arrowdown' || key === 's') {
-    startMenuIndex = (startMenuIndex + 1) % startMenuButtons.length;
-    highlightStartButton();
+    moveStartMenuSelection(1);
     event.preventDefault();
     return true;
   }
@@ -1897,11 +2196,15 @@ function updateGame2(delta) {
     if (keys[players[0].controls.down]) driverInput.y -= 1;
     if (keys[players[0].controls.left]) driverInput.x += 1;
     if (keys[players[0].controls.right]) driverInput.x -= 1;
+    addGamepadMovementInputGame2(driverInput, players[0].gamepadIndex);
     if (keys[players[0].controls.rotateLeft]) {
-      rotateInput = 1;
-    } else if (keys[players[0].controls.rotateRight]) {
-      rotateInput = -1;
+      rotateInput += 1;
     }
+    if (keys[players[0].controls.rotateRight]) {
+      rotateInput -= 1;
+    }
+    rotateInput += getGamepadRotateInput(players[0].gamepadIndex);
+    rotateInput = THREE.MathUtils.clamp(rotateInput, -1, 1);
   }
 
   const baseVelocity = game2State.baseVelocity;
@@ -1944,13 +2247,20 @@ function updateGame2(delta) {
 
   const turretAIHandled = updateGame2TurretAI(delta);
   if (!turretAIHandled) {
-    if (keys[game2GunnerControls.rotateLeft]) {
-      turretPivot.rotation.y += GAME2_TURRET_SPEED * delta;
+    let turretRotateInput = 0;
+    if (keys[game2GunnerControls.rotateLeft]) turretRotateInput += 1;
+    if (keys[game2GunnerControls.rotateRight]) turretRotateInput -= 1;
+    const gunnerPadIndex = players[1].gamepadIndex;
+    turretRotateInput += getGamepadRotateInput(gunnerPadIndex);
+    turretRotateInput = THREE.MathUtils.clamp(turretRotateInput, -1, 1);
+    if (turretRotateInput !== 0) {
+      turretPivot.rotation.y += turretRotateInput * GAME2_TURRET_SPEED * delta;
     }
-    if (keys[game2GunnerControls.rotateRight]) {
-      turretPivot.rotation.y -= GAME2_TURRET_SPEED * delta;
-    }
-    if (keys[game2GunnerControls.fire] && game2State.fireCooldown <= 0) {
+    const gunnerFiring =
+      keys[game2GunnerControls.fire] ||
+      isGamepadButtonDown(gunnerPadIndex, GAMEPAD_BUTTONS.A) ||
+      isGamepadButtonDown(gunnerPadIndex, GAMEPAD_BUTTONS.RT);
+    if (gunnerFiring && game2State.fireCooldown <= 0) {
       spawnPlayerBullet();
     }
   }
@@ -2172,7 +2482,11 @@ function updatePlayer(player, delta) {
     if (keys[player.controls.down]) moveInput.y += 1;
     if (keys[player.controls.left]) moveInput.x -= 1;
     if (keys[player.controls.right]) moveInput.x += 1;
-    rotateInput = (keys[player.controls.rotateLeft] ? 1 : 0) - (keys[player.controls.rotateRight] ? 1 : 0);
+    addGamepadMovementInputJoust(moveInput, player.gamepadIndex);
+    rotateInput =
+      (keys[player.controls.rotateLeft] ? 1 : 0) - (keys[player.controls.rotateRight] ? 1 : 0);
+    rotateInput += getGamepadRotateInput(player.gamepadIndex);
+    rotateInput = THREE.MathUtils.clamp(rotateInput, -1, 1);
   }
 
   if (moveInput.lengthSq() > 0) {
@@ -2226,7 +2540,9 @@ function applyCameraShake(delta) {
 
 function animate() {
   requestAnimationFrame(animate);
+  updateGamepads();
   const delta = clock.getDelta();
+  handleGamepadMenus();
 
   if (currentGame === 'joust') {
     players.forEach((player) => updatePlayer(player, delta));
