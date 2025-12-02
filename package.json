@@ -3,9 +3,12 @@
   "private": true,
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dev": "NODE_ENV=development electron .",
+    "dev-nogpu": "NODE_ENV=development electron . --disable-gpu"
   },
   "dependencies": {
+    "pdfjs-dist": "^5.4.449",
     "three": "^0.181.2",
     "webgazer": "^3.4.0"
   },

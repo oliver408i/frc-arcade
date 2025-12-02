@@ -23,6 +23,10 @@ const gazePointer = document.getElementById('gazePointer');
 const gazePaddleCanvas = document.getElementById('gazePaddleCanvas');
 const gazeRunnerButton = startMenu.querySelector('button[data-game="gazeRunner"]');
 const loadGazeCalibrationButton = document.getElementById('loadGazeCalibrationButton');
+const screensaverOverlay = document.getElementById('screensaverOverlay');
+const screensaverCanvas = document.getElementById('screensaverCanvas');
+const screensaverDebugButton = document.getElementById('screensaverDebugButton');
+const deviceInfoOverlay = document.getElementById('deviceInfoOverlay');
 
 module.exports = {
   appContainer,
@@ -50,4 +54,8 @@ module.exports = {
   gazeCoords,
   gazePointer,
   gazePaddleCanvas,
+  screensaverOverlay,
+  screensaverCanvas,
+  screensaverDebugButton,
+  deviceInfoOverlay,
 };

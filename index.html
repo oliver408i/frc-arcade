@@ -280,6 +280,56 @@
         opacity: 0.85;
       }
 
+      #screensaverOverlay {
+        position: absolute;
+        inset: 0;
+        background: #000;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.35s ease;
+        z-index: 20;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #screensaverOverlay.visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      #screensaverOverlay canvas {
+        background: #000;
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+      }
+
+      #deviceInfoOverlay {
+        position: absolute;
+        bottom: 8px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(83, 255, 210, 0.35);
+        border-radius: 6px;
+        padding: 6px 9px;
+        font-size: 0.65rem;
+        letter-spacing: 0.05em;
+        color: #f8f7ff;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        z-index: 30;
+        pointer-events: none;
+        text-align: right;
+        max-width: 28vw;
+        word-break: break-word;
+        white-space: normal;
+      }
+
+      #deviceInfoOverlay div {
+        white-space: normal;
+      }
+
       .gaze-panel {
         margin-top: 12px;
         text-align: center;
@@ -307,11 +357,12 @@
         <button data-game="joust">Robot Joust</button>
         <button data-game="shooter">Driver + Gunner Shooter</button>
         <button data-game="gaze">Gaze Calibration</button>
-        <button data-game="gazePaddle" disabled>Gaze Paddle Test</button>
-        <button data-game="gazeRunner" disabled>Gaze Lane Runner</button>
+        <button data-game="gazePaddle" disabled>Gaze Paddle</button>
+        <button data-game="gazeRunner" disable class="debug-button">[LEGACY] Gaze Lane Runner</button>
         <button id="loadGazeCalibrationButton" class="debug-button">
           Load Saved Calibration (Debug)
         </button>
+        <button id="screensaverDebugButton" class="debug-button">Start Screensaver (Debug)</button>
       </div>
     </div>
     <div id="app"></div>
@@ -365,6 +416,15 @@
         </div>
       </div>
     </div>
+    <div
+      id="screensaverOverlay"
+      aria-hidden="true"
+      data-base-src="screensaver.pdf"
+      data-page-duration="12000"
+    >
+      <canvas id="screensaverCanvas" width="1920" height="1080"></canvas>
+    </div>
+    <div id="deviceInfoOverlay" aria-live="polite" aria-atomic="true"></div>
     <script>
       (async () => {
   const devices = await navigator.mediaDevices.enumerateDevices();
@@ -411,6 +471,9 @@
     return origGetUserMedia(constraints);
   };
 })();
+
+// Monkey patch window.alert for webgazer
+window.alert = console.log
 
     </script>
     <script src="lib/webgazer.js"></script>

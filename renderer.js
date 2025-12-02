@@ -1495,7 +1495,7 @@ async function initGazeGame() {
   updateGazeRunnerButton();
   setGazeStatusText('GAZE MODE — TESTING');
   setScoreboardText('GAZE CALIBRATION', 'TEST MODE', '');
-  showCenterMessage('Calibration disabled — tracking running in test mode', 0);
+  showCenterMessage('Look & Click to calibrate', 0);
   setGazeCoordsText(null, null);
   await ensureGazeListener();
   updateAIUI();
