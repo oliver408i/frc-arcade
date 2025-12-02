@@ -1,6 +1,8 @@
+const os = require('os');
 const THREE = require('three');
 const constants = require('./renderer/modules/constants');
 const dom = require('./renderer/modules/dom');
+const createScreensaver = require('./renderer/modules/screensaver');
 const sceneSetup = require('./renderer/modules/scene');
 let gazeModulePromise = null;
 function loadGazeModule() {
@@ -67,7 +69,128 @@ const {
   gazePaddleCanvas,
   gazeRunnerButton,
   loadGazeCalibrationButton,
+  screensaverOverlay,
+  screensaverCanvas,
+  screensaverDebugButton,
+  deviceInfoOverlay,
 } = dom;
+
+const isDebugMode = process.env.NODE_ENV === 'development';
+
+if (!isDebugMode) {
+  if (loadGazeCalibrationButton) {
+    loadGazeCalibrationButton.remove();
+  }
+  if (screensaverDebugButton) {
+    screensaverDebugButton.remove();
+  }
+  if (deviceInfoOverlay) {
+    deviceInfoOverlay.remove();
+  }
+}
+
+function detectWebGLDiagnostics() {
+  const canvas = document.createElement('canvas');
+  const gl =
+    canvas.getContext('webgl2') ||
+    canvas.getContext('webgl') ||
+    canvas.getContext('experimental-webgl');
+
+  if (!gl) {
+    return "WebGL unavailable (no context)";
+  }
+
+  const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+
+  const renderer = debugInfo
+    ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+    : gl.getParameter(gl.RENDERER);
+
+  const vendor = debugInfo
+    ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
+    : gl.getParameter(gl.VENDOR);
+
+  const rendererLabel = renderer || "Unknown Renderer";
+  const vendorLabel = vendor || "Unknown Vendor";
+
+  // Software indicators
+  const isSoftware = /(swiftshader|llvmpipe|softpipe|software rasterizer)/i.test(
+    rendererLabel
+  );
+
+  const hardwareAcceleration = !isSoftware;
+
+  // Build a clean human readable result
+  return (
+    `Vendor: ${vendorLabel}\n` +
+    `Renderer: ${rendererLabel}\n` +
+    `Hardware Acceleration: ${hardwareAcceleration ? "YES" : "NO"}`
+  );
+}
+
+
+function populateDeviceInfoOverlay() {
+  if (!deviceInfoOverlay) return;
+
+  // --- Host / OS Info ---
+  const hostname =
+    (typeof os.hostname === "function" && os.hostname()) ||
+    "Unknown Host";
+
+  const osType = (typeof os.type === "function" && os.type()) || "Unknown OS";
+  const osRelease =
+    (typeof os.release === "function" && os.release()) || "Unknown Release";
+  const osArch = (typeof os.arch === "function" && os.arch()) || "Unknown Arch";
+
+  const osLabel = `${osType} ${osRelease} (${osArch})`;
+
+  // --- CPU Info ---
+  const cpuList = typeof os.cpus === "function" ? os.cpus() : [];
+  const cpuCount = cpuList.length;
+  const cpuModel =
+    cpuList?.[0]?.model?.trim() || "Unknown CPU";
+
+  const cpuLabel =
+    cpuCount > 1
+      ? `${cpuCount}× ${cpuModel}`
+      : cpuModel;
+
+  // --- WebGL Info ---
+  const glInfoString = detectWebGLDiagnostics(); // Already human-readable
+  const glInfoLines = glInfoString.split("\n");
+
+  // --- Build UI ---
+  const lines = [
+    `HOST: ${hostname}`,
+    `OS: ${osLabel}`,
+    `CPU: ${cpuLabel}`,
+    ...glInfoLines,
+  ];
+
+  deviceInfoOverlay.innerHTML = lines
+    .map((line) => `<div>${line}</div>`)
+    .join("");
+}
+
+
+if (isDebugMode) {
+  populateDeviceInfoOverlay();
+}
+
+const SCREENSAVER_TIMEOUT_MS = 120000; // 2 minutes
+const {
+  show: showScreensaver,
+  hide: hideScreensaver,
+  reset: resetScreensaverTimer,
+  handleActivity: handleScreensaverActivity,
+  start: initScreensaverTracking,
+} = createScreensaver({
+  overlay: screensaverOverlay,
+  canvas: screensaverCanvas,
+  debugButton: isDebugMode ? screensaverDebugButton : null,
+  timeout: SCREENSAVER_TIMEOUT_MS,
+  debugMode: isDebugMode,
+});
 const gazePaddleCtx = gazePaddleCanvas ? gazePaddleCanvas.getContext('2d') : null;
 
 const {
@@ -432,14 +555,20 @@ function updateGamepadState(state, pad) {
     if (pressed && !state.buttons[i]) {
       state.justPressed.push(i);
       state.justPressedSet.add(i);
+      handleScreensaverActivity();
     } else if (!pressed && state.buttons[i]) {
       state.justReleased.push(i);
     }
     state.buttons[i] = pressed;
   }
   for (let axisIndex = 0; axisIndex < state.axes.length; axisIndex += 1) {
+    const previousValue = state.axes[axisIndex];
     const raw = pad.axes[axisIndex] != null ? pad.axes[axisIndex] : 0;
-    state.axes[axisIndex] = applyDeadzone(raw);
+    const cleaned = applyDeadzone(raw);
+    state.axes[axisIndex] = cleaned;
+    if (cleaned !== 0 && cleaned !== previousValue) {
+      handleScreensaverActivity();
+    }
   }
   state.leftStick.x = state.axes[0] || 0;
   state.leftStick.y = state.axes[1] || 0;
@@ -779,7 +908,7 @@ startMenuButtons.forEach((button, index) => {
   });
 });
 
-if (loadGazeCalibrationButton) {
+if (isDebugMode && loadGazeCalibrationButton) {
   loadGazeCalibrationButton.addEventListener('click', (event) => {
     event.preventDefault();
     gazeGameState.useSavedCalibration = true;
@@ -2597,5 +2726,6 @@ window.addEventListener('blur', () => {
 });
 
 updateGazePaddleDimensions();
+initScreensaverTracking();
 showStartMenu();
 animate();
