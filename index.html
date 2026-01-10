@@ -211,6 +211,376 @@
         display: none;
       }
 
+      .hidden {
+        display: none !important;
+      }
+
+      #panoSelector {
+        position: absolute;
+        inset: 0;
+        background: rgba(2, 3, 15, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 25;
+        pointer-events: none;
+      }
+
+      #panoSelector.visible {
+        pointer-events: auto;
+      }
+
+      #panoSelectorPanel {
+        width: min(640px, 90vw);
+        background: rgba(4, 5, 18, 0.98);
+        border: 1px solid rgba(83, 255, 210, 0.5);
+        padding: 28px;
+        border-radius: 18px;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.65);
+      }
+
+      #panoSelectorPanel header {
+        margin-bottom: 16px;
+        text-align: center;
+      }
+
+      #panoSelectorPanel h2 {
+        margin: 0;
+        letter-spacing: 0.4em;
+        font-size: 1.5rem;
+      }
+
+      #panoSelectorPanel p {
+        margin: 6px 0 0;
+        opacity: 0.7;
+        font-size: 0.85rem;
+      }
+
+      #panoSelectorList {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 16px;
+        max-height: 320px;
+        overflow-y: auto;
+        padding-right: 8px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+
+      #panoSelectorList::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+      }
+
+      .pano-object-card {
+        display: flex;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(8, 10, 32, 0.85);
+        border: 1px solid rgba(83, 255, 210, 0.3);
+        align-items: center;
+      }
+
+      #panoResetButton {
+        position: absolute;
+        top: 16px;
+        right: 24px;
+        padding: 10px 16px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(83, 255, 210, 0.6);
+        border-radius: 12px;
+        color: #f8f7ff;
+        letter-spacing: 0.4em;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        cursor: pointer;
+        pointer-events: auto;
+        z-index: 19;
+      }
+
+      .pano-object-card img {
+        width: 64px;
+        height: 64px;
+        object-fit: cover;
+        border-radius: 8px;
+        background: #05091d;
+        border: 1px solid rgba(83, 255, 210, 0.35);
+      }
+
+      .pano-object-card button {
+        margin-left: auto;
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: none;
+        background: rgba(83, 255, 210, 0.25);
+        color: #f8f7ff;
+        letter-spacing: 0.2em;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+
+      .pano-object-card button:hover {
+        background: rgba(83, 255, 210, 0.45);
+      }
+
+      .pano-object-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .pano-object-meta span {
+        font-size: 0.75rem;
+        letter-spacing: 0.3em;
+        opacity: 0.65;
+      }
+
+      .pano-hint-card {
+        position: absolute;
+        bottom: 32px;
+        left: 32px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 16px;
+        background: rgba(3, 6, 25, 0.9);
+        border: 1px solid rgba(83, 255, 210, 0.4);
+        border-radius: 14px;
+        box-shadow: 0 0 25px rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+        z-index: 18;
+      }
+
+      .pano-hint-card img {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        object-fit: cover;
+        border: 1px solid rgba(83, 255, 210, 0.5);
+      }
+
+      .pano-hint-card p {
+        margin: 0;
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+      }
+
+      #panoFoundOverlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 19;
+      }
+
+      #panoFoundOverlay.visible {
+        pointer-events: none;
+      }
+
+      #panoHighlightOverlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 17;
+      }
+
+      #panoHighlightOverlay canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      #panoFoundPanel {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        padding: 14px 18px;
+        background: rgba(3, 6, 25, 0.92);
+        border-radius: 16px;
+        border: 1px solid rgba(83, 255, 210, 0.6);
+        box-shadow: 0 0 35px rgba(83, 255, 210, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: min(320px, 38vw);
+        width: min(320px, 38vw);
+        box-sizing: border-box;
+        pointer-events: auto;
+        z-index: 20;
+      }
+
+      #panoFoundPanel h3 {
+        margin: 0;
+        letter-spacing: 0.3em;
+        font-size: 0.85rem;
+        opacity: 0.8;
+      }
+
+      #panoFoundPanel p {
+        margin: 0;
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        opacity: 0.75;
+      }
+
+      #panoFoundPanel button {
+        align-self: flex-start;
+        padding: 8px 14px;
+        background: rgba(83, 255, 210, 0.12);
+        border: 1px solid rgba(83, 255, 210, 0.8);
+        border-radius: 12px;
+        color: #f8f7ff;
+        text-transform: uppercase;
+        letter-spacing: 0.25em;
+        font-size: 0.65rem;
+        cursor: pointer;
+      }
+
+      #panoDevPanel {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: min(320px, 86vw);
+        background: rgba(4, 5, 18, 0.95);
+        border-radius: 18px;
+        border: 1px solid rgba(83, 255, 210, 0.4);
+        padding: 16px;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.65);
+        color: #f8f7ff;
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        z-index: 35;
+        pointer-events: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      #panoDevPanel.hidden {
+        display: none !important;
+      }
+
+      #panoDevPanel h3 {
+        margin: 0;
+        font-size: 0.95rem;
+        letter-spacing: 0.4em;
+        text-align: center;
+      }
+
+      #panoDevPanel select {
+        width: 100%;
+        background: rgba(3, 6, 25, 0.9);
+        border: 1px solid rgba(83, 255, 210, 0.4);
+        color: #f8f7ff;
+        border-radius: 10px;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+      }
+
+      .pano-dev-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .pano-dev-row button {
+        flex: 1;
+        border: none;
+        border-radius: 10px;
+        background: rgba(83, 255, 210, 0.2);
+        color: #f8f7ff;
+        letter-spacing: 0.1em;
+        cursor: pointer;
+        padding: 6px 8px;
+        font-size: 0.75rem;
+      }
+
+      .pano-dev-row button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .pano-dev-row input {
+        flex: 1;
+        border-radius: 10px;
+        border: 1px solid rgba(83, 255, 210, 0.4);
+        background: rgba(3, 6, 25, 0.9);
+        color: #f8f7ff;
+        padding: 6px 8px;
+        font-size: 0.7rem;
+      }
+
+      #panoDevToggle {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        border: none;
+        border-radius: 10px;
+        padding: 4px 10px;
+        background: rgba(83, 255, 210, 0.25);
+        color: #f8f7ff;
+        letter-spacing: 0.2em;
+        font-size: 0.7rem;
+        cursor: pointer;
+        z-index: 36;
+        pointer-events: auto;
+      }
+
+      #panoDevToggle.hidden {
+        display: none;
+      }
+
+      #panoDevPolygonList {
+        max-height: 140px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .pano-dev-polygon {
+        background: rgba(8, 10, 32, 0.9);
+        border-radius: 10px;
+        border: 1px solid rgba(83, 255, 210, 0.2);
+        padding: 6px 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .pano-dev-polygon button {
+        flex: 0 auto;
+        padding: 4px 10px;
+        background: rgba(255, 90, 216, 0.3);
+        border: none;
+        border-radius: 8px;
+      }
+
+      .pano-dev-status {
+        min-height: 18px;
+        opacity: 0.75;
+        font-size: 0.7rem;
+      }
+
+      #panoDevOverlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 34;
+      }
+
+      #panoDevOverlay canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      #panoDevOverlay.hidden {
+        display: none;
+      }
+
       .menu-panel-content.active {
         display: block;
       }
@@ -356,6 +726,7 @@
         <p>Use ↑/↓ + Enter</p>
         <button data-game="joust">Robot Joust</button>
         <button data-game="shooter">Driver + Gunner Shooter</button>
+        <button data-game="pano">Find the Object Panorama</button>
         <button data-game="gaze">Gaze Calibration</button>
         <button data-game="gazePaddle" disabled>Gaze Paddle</button>
         <button data-game="gazeRunner" disable class="debug-button">[LEGACY] Gaze Lane Runner</button>
@@ -365,7 +736,28 @@
         <button id="screensaverDebugButton" class="debug-button">Start Screensaver (Debug)</button>
       </div>
     </div>
+    <div id="panoSelector" class="hidden">
+      <div id="panoSelectorPanel">
+        <header>
+          <h2>FIND THE OBJECT</h2>
+          <p>Select a difficulty to begin</p>
+        </header>
+        <div id="panoSelectorList"></div>
+        <button id="panoDevSelectorSkip" class="hidden">SKIP (DEV)</button>
+      </div>
+    </div>
     <div id="app"></div>
+    <div id="panoDevOverlay" class="hidden">
+      <canvas id="panoDevOverlayCanvas"></canvas>
+    </div>
+    <button id="panoDevToggle" class="hidden">SHOW DEV</button>
+    <div id="panoHintCard" class="pano-hint-card hidden">
+      <img id="panoHintImage" alt="Reference hint" />
+      <div>
+        <div id="panoHintName"></div>
+        <p id="panoHintDifficulty"></p>
+      </div>
+    </div>
     <div id="hitFlash"></div>
     <div id="gazePointer"></div>
     <canvas id="gazePaddleCanvas" width="640" height="360"></canvas>
@@ -376,6 +768,7 @@
         <div id="p2Score">PLAYER 2 — 0</div>
       </div>
       <div class="ai-indicator" id="aiIndicator">P2 MODE — HUMAN</div>
+      <button id="panoResetButton" class="hidden">RESET SEARCH</button>
       <div id="centerMessage"></div>
       <div class="controls">
         <div>
@@ -415,6 +808,43 @@
           <button data-action="settings-back">Back to Menu</button>
         </div>
       </div>
+    </div>
+    <div id="panoFoundOverlay" class="hidden">
+      <div id="panoFoundPanel">
+        <h3>OBJECT FOUND</h3>
+        <p id="panoFoundDescription"></p>
+        <button id="panoRechooseButton">FIND ANOTHER</button>
+      </div>
+    </div>
+    <div id="panoHighlightOverlay" class="hidden">
+      <canvas id="panoHighlightCanvas"></canvas>
+    </div>
+    <div id="panoDevPanel" class="hidden">
+        <h3>PANO DEV</h3>
+        <div class="pano-dev-row">
+          <input id="panoDevAddName" placeholder="New object name" />
+          <button id="panoDevAddButton">ADD</button>
+        </div>
+        <label>
+          OBJECT
+          <select id="panoDevObjectSelect"></select>
+        </label>
+        <div class="pano-dev-row">
+        <button id="panoDevStartPolygon">Start Polygon</button>
+        <button id="panoDevFinishPolygon" disabled>Finish</button>
+      </div>
+      <div class="pano-dev-row">
+        <button id="panoDevRemovePolygon">Remove Last</button>
+      </div>
+      <div id="panoDevPolygonList"></div>
+      <div class="pano-dev-row">
+        <span>Points: <span id="panoDevPointCount">0</span></span>
+      </div>
+      <div class="pano-dev-row">
+        <button id="panoDevSave">Save</button>
+        <button id="panoDevReload">Reload</button>
+      </div>
+      <span id="panoDevStatus" class="pano-dev-status"></span>
     </div>
     <div
       id="screensaverOverlay"

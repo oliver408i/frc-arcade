@@ -27,6 +27,35 @@ const screensaverOverlay = document.getElementById('screensaverOverlay');
 const screensaverCanvas = document.getElementById('screensaverCanvas');
 const screensaverDebugButton = document.getElementById('screensaverDebugButton');
 const deviceInfoOverlay = document.getElementById('deviceInfoOverlay');
+const panoSelector = document.getElementById('panoSelector');
+const panoSelectorList = document.getElementById('panoSelectorList');
+const panoHintImage = document.getElementById('panoHintImage');
+const panoHintName = document.getElementById('panoHintName');
+const panoHintDifficulty = document.getElementById('panoHintDifficulty');
+const panoFoundOverlay = document.getElementById('panoFoundOverlay');
+const panoFoundDescription = document.getElementById('panoFoundDescription');
+const panoFoundPanel = document.getElementById('panoFoundPanel');
+const panoRechooseButton = document.getElementById('panoRechooseButton');
+const panoHintCard = document.getElementById('panoHintCard');
+const panoDevPanel = document.getElementById('panoDevPanel');
+const panoDevObjectSelect = document.getElementById('panoDevObjectSelect');
+const panoDevPolygonList = document.getElementById('panoDevPolygonList');
+const panoDevPointCount = document.getElementById('panoDevPointCount');
+const panoDevStartPolygon = document.getElementById('panoDevStartPolygon');
+const panoDevFinishPolygon = document.getElementById('panoDevFinishPolygon');
+const panoDevRemovePolygon = document.getElementById('panoDevRemovePolygon');
+const panoDevSave = document.getElementById('panoDevSave');
+const panoDevReload = document.getElementById('panoDevReload');
+const panoDevStatus = document.getElementById('panoDevStatus');
+const panoDevToggle = document.getElementById('panoDevToggle');
+const panoDevSelectorSkip = document.getElementById('panoDevSelectorSkip');
+const panoDevAddName = document.getElementById('panoDevAddName');
+const panoDevAddButton = document.getElementById('panoDevAddButton');
+const panoDevOverlay = document.getElementById('panoDevOverlay');
+const panoDevOverlayCanvas = document.getElementById('panoDevOverlayCanvas');
+const panoHighlightOverlay = document.getElementById('panoHighlightOverlay');
+const panoHighlightCanvas = document.getElementById('panoHighlightCanvas');
+const panoResetButton = document.getElementById('panoResetButton');
 
 module.exports = {
   appContainer,
@@ -58,4 +87,33 @@ module.exports = {
   screensaverCanvas,
   screensaverDebugButton,
   deviceInfoOverlay,
+  panoSelector,
+  panoSelectorList,
+  panoHintCard,
+  panoHintImage,
+  panoHintName,
+  panoHintDifficulty,
+  panoFoundPanel,
+  panoDevPanel,
+  panoDevObjectSelect,
+  panoDevPolygonList,
+  panoDevPointCount,
+  panoDevStartPolygon,
+  panoDevFinishPolygon,
+  panoDevRemovePolygon,
+  panoDevSave,
+  panoDevReload,
+  panoDevStatus,
+  panoDevToggle,
+  panoDevSelectorSkip,
+  panoDevAddName,
+  panoDevAddButton,
+  panoFoundOverlay,
+  panoFoundDescription,
+  panoRechooseButton,
+  panoHighlightOverlay,
+  panoHighlightCanvas,
+  panoResetButton,
+  panoDevOverlay,
+  panoDevOverlayCanvas,
 };
