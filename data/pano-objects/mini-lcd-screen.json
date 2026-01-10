@@ -1,7 +1,7 @@
 {
   "name": "Mini LCD Screen",
-  "difficulty": "Easy",
-  "description": "",
+  "difficulty": "Expert",
+  "description": "You’ve spotted the Mini LCD Display. This was supposed to be the glorious dashboard for the robot's diagnostics, but right now it’s just a fragile piece of glass lying flat on a desk. It’s an Expert find because it's so thin and reflective; from this angle, it looks more like a shadow or a scrap of plastic than a high-tech interface.",
   "referenceImage": "",
   "polygons": [
     [

@@ -1,7 +1,7 @@
 {
   "name": "Light Switch",
   "difficulty": "Easy",
-  "description": "",
+  "description": "You’ve found the Lightswitch, one of the few things in this room that actually belongs to the building and wasn't scavenged from a dumpster. In an FRC lab, this is the most dangerous button in the room—flick it at the wrong time, and you’ll plunge the programmers into darkness just as they were finally about to fix that 'broken' auto-routine. It’s white-on-white, making it a classic 'hidden in plain sight' target for anyone not paying attention to the walls.",
   "referenceImage": "",
   "polygons": [
     [

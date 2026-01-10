@@ -1,7 +1,7 @@
 {
   "name": "Webcam",
-  "difficulty": "Easy",
-  "description": "",
+  "difficulty": "Medium",
+  "description": "This is a USB Webcam, or as the software team calls it, the 'Vision Processing Nightmare.' It’s currently sitting face-down on the desk, likely because it failed to track a single AprilTag during last night's testing. It’s small, black, and tangled in its own cord, making it a Medium difficulty find amidst the sea of other dark peripherals.",
   "referenceImage": "",
   "polygons": [
     [

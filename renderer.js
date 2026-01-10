@@ -130,6 +130,19 @@ let panoDevPanelVisible = false;
 const PANO_DEFAULT_DIFFICULTY = 'Easy';
 const PANO_DEFAULT_DESCRIPTION = '';
 const PANO_DEFAULT_REFERENCE = '';
+const DIFFICULTY_ORDER = ['easy', 'medium', 'hard', 'expert'];
+const DIFFICULTY_COLORS = {
+  easy: '#85ffc2',
+  medium: '#f7c948',
+  hard: '#ff8c42',
+  expert: '#ff4c7a',
+};
+
+function getDifficultyPriority(label) {
+  const key = (label || '').trim().toLowerCase();
+  const index = DIFFICULTY_ORDER.indexOf(key);
+  return index === -1 ? DIFFICULTY_ORDER.length : index;
+}
 
 if (!isDebugMode) {
   if (loadGazeCalibrationButton) {
@@ -1278,7 +1291,7 @@ function updateAIUI() {
       aiIndicator.textContent = 'GAZE LANE RUNNER';
       aiIndicator.classList.add('active');
     } else if (currentGame === 'pano') {
-      aiIndicator.textContent = 'PANORAMA EXPLORER';
+      aiIndicator.textContent = '';
       aiIndicator.classList.add('active');
     } else {
       aiIndicator.textContent = aiEnabled
@@ -2174,6 +2187,13 @@ async function loadPanoObjects() {
         console.error('[PanoObjects]', entry, error);
       }
     }
+    items.sort((a, b) => {
+      const diff = getDifficultyPriority(a.difficulty) - getDifficultyPriority(b.difficulty);
+      if (diff !== 0) {
+        return diff;
+      }
+      return a.name.localeCompare(b.name);
+    });
     panoObjectsState.items = items;
   } catch (error) {
     console.error('[PanoObjects]', error);
@@ -2228,7 +2248,10 @@ function renderPanoSelector(items) {
     const name = document.createElement('strong');
     name.textContent = item.name;
     const difficulty = document.createElement('span');
-    difficulty.textContent = (item.difficulty || 'UNKNOWN').toUpperCase();
+    const difficultyLabel = (item.difficulty || 'UNKNOWN').toUpperCase();
+    const difficultyKey = (item.difficulty || '').trim().toLowerCase();
+    difficulty.textContent = difficultyLabel;
+    difficulty.style.color = DIFFICULTY_COLORS[difficultyKey] || '#53ffd2';
     meta.appendChild(name);
     meta.appendChild(difficulty);
     card.appendChild(meta);
@@ -2430,7 +2453,7 @@ function showPanoSelectorOverlay() {
 
 function skipPanoSelection() {
   setPanoSelectorVisible(false);
-  setScoreboardText('FIND THE OBJECT', 'PANORAMA', 'DEV MODE');
+  setScoreboardText('FIND THE OBJECT', '', 'DEV MODE');
   showCenterMessage('Selection skipped — choose a target later.', 1600);
 }
 
@@ -2913,7 +2936,7 @@ function initPanoGame() {
   camera.up.set(0, 1, 0);
   camera.updateProjectionMatrix();
   updatePanoView(0);
-  setScoreboardText('FIND THE OBJECT', 'PANORAMA', 'CLICK + DRAG');
+  setScoreboardText('FIND THE OBJECT', '', 'CLICK + DRAG');
   showCenterMessage('Drag to pan, scroll to zoom', 2400);
   updateControlHints('pano');
   updateAIUI();
