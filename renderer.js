@@ -154,7 +154,7 @@ const DIFFICULTY_COLORS = {
 };
 const DEFAULT_BLOOM_THRESHOLD = 0.55;
 const DEFAULT_AMBIENT_INTENSITY = 1.2;
-const LIGHT_SWITCH_AMBIENT_INTENSITY = 3.5;
+const LIGHT_SWITCH_AMBIENT_INTENSITY = 4.5;
 const LIGHT_SWITCH_ID = 'light-switch';
 let isLightSwitchBright = false;
 
