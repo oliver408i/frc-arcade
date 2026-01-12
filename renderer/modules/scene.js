@@ -11,6 +11,12 @@ const { appContainer } = require('./dom');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.35;
+renderer.physicallyCorrectLights = true;
 appContainer.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -31,10 +37,10 @@ camera.up.set(0, 0, -1);
 turretCamera.position.set(6, 8, -6);
 turretCamera.lookAt(0, 0, 0);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.55);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
 scene.add(ambientLight);
 
-const spot = new THREE.SpotLight(0xffffff, 1.4, 180, Math.PI / 4, 0.3, 1);
+const spot = new THREE.SpotLight(0xffffff, 1.6, 200, Math.PI / 4, 0.25, 1);
 spot.position.set(0, 60, 0);
 spot.target.position.set(0, 0, 0);
 scene.add(spot);
@@ -53,6 +59,17 @@ const arenaSurface = new THREE.Mesh(
 );
 arenaSurface.rotation.x = -Math.PI / 2;
 scene.add(arenaSurface);
+
+const rimLight = new THREE.PointLight(0xffa5d7, 1.15, 160, 2);
+rimLight.position.set(-28, 35, 18);
+scene.add(rimLight);
+const fillLight = new THREE.HemisphereLight(0x98ffef, 0x0a0b1c, 0.65);
+scene.add(fillLight);
+const accentSpot = new THREE.SpotLight(0x7f94ff, 1, 180, Math.PI / 6, 0.45, 1);
+accentSpot.position.set(30, 45, -20);
+accentSpot.target.position.set(0, 0, 0);
+scene.add(accentSpot);
+scene.add(accentSpot.target);
 
 function createRimMesh(radius, color, rimWidth, yOffset) {
   const material = new THREE.MeshBasicMaterial({

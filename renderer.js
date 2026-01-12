@@ -2,6 +2,12 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const THREE = require('three');
+global.THREE = THREE;
+const { EffectComposer } = require('three/addons/postprocessing/EffectComposer.js');
+const { RenderPass } = require('three/addons/postprocessing/RenderPass.js');
+const { UnrealBloomPass } = require('three/addons/postprocessing/UnrealBloomPass.js');
+const { SMAAPass } = require('three/addons/postprocessing/SMAAPass.js');
+const { SSAOPass } = require('three/addons/postprocessing/SSAOPass.js');
 const constants = require('./renderer/modules/constants');
 const dom = require('./renderer/modules/dom');
 const fsPromises = fs.promises;
@@ -110,6 +116,11 @@ const {
 
 const panoDevOverlayCtx = panoDevOverlayCanvas ? panoDevOverlayCanvas.getContext('2d') : null;
 const panoHighlightOverlayCtx = panoHighlightCanvas ? panoHighlightCanvas.getContext('2d') : null;
+let effectComposer = null;
+let postRenderPass = null;
+let postSSAOPass = null;
+let postBloomPass = null;
+let postSMAPass = null;
 let currentGame = null;
 
 const isDebugMode = process.env.NODE_ENV === 'development';
@@ -130,6 +141,10 @@ let panoDevPanelVisible = false;
 const PANO_DEFAULT_DIFFICULTY = 'Easy';
 const PANO_DEFAULT_DESCRIPTION = '';
 const PANO_DEFAULT_REFERENCE = '';
+const panoObjectsState = {
+  items: [],
+  loaded: false,
+};
 const DIFFICULTY_ORDER = ['easy', 'medium', 'hard', 'expert'];
 const DIFFICULTY_COLORS = {
   easy: '#85ffc2',
@@ -137,6 +152,11 @@ const DIFFICULTY_COLORS = {
   hard: '#ff8c42',
   expert: '#ff4c7a',
 };
+const DEFAULT_BLOOM_THRESHOLD = 0.55;
+const DEFAULT_AMBIENT_INTENSITY = 1.2;
+const LIGHT_SWITCH_AMBIENT_INTENSITY = 3.5;
+const LIGHT_SWITCH_ID = 'light-switch';
+let isLightSwitchBright = false;
 
 function getDifficultyPriority(label) {
   const key = (label || '').trim().toLowerCase();
@@ -286,6 +306,7 @@ const {
   camera,
   turretCamera,
   cameraBasePosition,
+  ambientLight,
   arenaSurface,
   glowingRim,
   shooterRim,
@@ -442,11 +463,6 @@ const panoDevProjectedVec = new THREE.Vector3();
 let webGazerInitialized = false;
 let gazeInitPromise = null;
 let gazeSessionCounter = 0;
-const panoObjectsState = {
-  items: [],
-  loaded: false,
-};
-
 function createRobot(colorHex, bumperHex) {
   const group = new THREE.Group();
 
@@ -2444,6 +2460,71 @@ function updatePanoDevOverlay() {
   }
 }
 
+function updateLightSwitchLighting() {
+  if (ambientLight) {
+    const targetIntensity = isLightSwitchBright
+      ? LIGHT_SWITCH_AMBIENT_INTENSITY
+      : DEFAULT_AMBIENT_INTENSITY;
+    ambientLight.intensity = targetIntensity;
+  }
+}
+
+function toggleLightSwitchLighting() {
+  isLightSwitchBright = !isLightSwitchBright;
+  updateLightSwitchLighting();
+  const message = isLightSwitchBright ? 'Lights brightened.' : 'Lights dimmed.';
+  showCenterMessage(message, 1200);
+}
+
+function initPostProcessing() {
+  if (effectComposer) return;
+  effectComposer = new EffectComposer(renderer);
+  postRenderPass = new RenderPass(scene, camera);
+  postRenderPass.renderToScreen = false;
+  effectComposer.addPass(postRenderPass);
+  const width = window.innerWidth;
+  const height = Math.max(window.innerHeight, 1);
+  postSSAOPass = new SSAOPass(scene, camera, width, height);
+  postSSAOPass.output = SSAOPass.OUTPUT.Default;
+  postSSAOPass.kernelRadius = 0.52;
+  postSSAOPass.kernelSize = 32;
+  postSSAOPass.minDistance = 0.001;
+  postSSAOPass.maxDistance = 0.05;
+  postSSAOPass.renderToScreen = false;
+  effectComposer.addPass(postSSAOPass);
+  postBloomPass = new UnrealBloomPass(
+    new THREE.Vector2(width, height),
+    1.2,
+    0.4,
+    0.9
+  );
+  postBloomPass.threshold = DEFAULT_BLOOM_THRESHOLD;
+  postBloomPass.strength = 0.55;
+  postBloomPass.radius = 0.4;
+  postBloomPass.renderToScreen = false;
+  effectComposer.addPass(postBloomPass);
+  postSMAPass = new SMAAPass(width, height);
+  postSMAPass.renderToScreen = true;
+  effectComposer.addPass(postSMAPass);
+  updateLightSwitchLighting();
+}
+
+function resizePostProcessing() {
+  if (!effectComposer) return;
+  const width = window.innerWidth;
+  const height = Math.max(window.innerHeight, 1);
+  effectComposer.setSize(width, height);
+  if (postBloomPass) {
+    postBloomPass.setSize(width, height);
+  }
+  if (postSMAPass) {
+    postSMAPass.setSize(width, height);
+  }
+  if (postSSAOPass) {
+    postSSAOPass.setSize(width, height);
+  }
+}
+
 function showPanoSelectorOverlay() {
   loadPanoObjects().then((items) => {
     renderPanoSelector(items);
@@ -2814,6 +2895,18 @@ function isPointInPolygon(point, polygon) {
   return inside;
 }
 
+function tryHandleLightSwitchToggle(point) {
+  if (!point || !panoObjectsState.items.length) return false;
+  const lightSwitch = panoObjectsState.items.find((item) => item.id === LIGHT_SWITCH_ID);
+  if (!lightSwitch || !Array.isArray(lightSwitch.polygons)) return false;
+  const matched = lightSwitch.polygons.some((polygon) => isPointInPolygon(point, polygon));
+  if (matched) {
+    toggleLightSwitchLighting();
+    return true;
+  }
+  return false;
+}
+
 function handlePanoSuccess(item) {
   if (!item) return;
   setScoreboardText(item.name.toUpperCase(), 'FOUND', (item.difficulty || '').toUpperCase());
@@ -2837,6 +2930,7 @@ function handlePanoClick(event) {
   const uv = getPanoUVFromEvent(event);
   if (!uv) return;
   const point = { x: uv.x, y: 1 - uv.y };
+  tryHandleLightSwitchToggle(point);
   const polygons = targetItem.polygons || [];
   const matched = polygons.some((polygon) => isPointInPolygon(point, polygon));
   if (matched) {
@@ -2893,7 +2987,7 @@ function ensurePanoMesh(texture) {
     PANO_ARC
   );
   geometry.scale(-1, 1, 1);
-  const material = new THREE.MeshBasicMaterial({ map: texture });
+  const material = new THREE.MeshStandardMaterial({ map: texture });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.rotation.y = 0;
   mesh.renderOrder = -5;
@@ -3846,7 +3940,17 @@ function animate() {
   } else {
     renderer.setScissorTest(false);
     renderer.setViewport(0, 0, window.innerWidth, Math.max(window.innerHeight, 1));
-    renderer.render(scene, camera);
+    if (currentGame !== 'pano' && effectComposer) {
+      if (postBloomPass) {
+        const targetThreshold = DEFAULT_BLOOM_THRESHOLD;
+        if (Math.abs(postBloomPass.threshold - targetThreshold) > 0.0001) {
+          postBloomPass.threshold = targetThreshold;
+        }
+      }
+      effectComposer.render();
+    } else {
+      renderer.render(scene, camera);
+    }
   }
   updatePanoDevOverlay();
   updatePanoHighlightOverlay();
@@ -3874,6 +3978,7 @@ function onResize() {
   renderer.setSize(width, height);
   resizePanoDevOverlay();
   resizePanoHighlightCanvas();
+  resizePostProcessing();
   updateGazePaddleDimensions({ preserveState: true });
 }
 
@@ -3891,6 +3996,11 @@ window.addEventListener('blur', () => {
 updateGazePaddleDimensions();
 resizePanoDevOverlay();
 resizePanoHighlightCanvas();
+initPostProcessing();
+resizePostProcessing();
+loadPanoTexture().catch((error) => {
+  console.warn('[Pano]', 'Preload failed', error);
+});
 initScreensaverTracking();
 showStartMenu();
 animate();
