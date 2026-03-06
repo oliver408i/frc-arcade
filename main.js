@@ -35,6 +35,23 @@ function clamp01(value) {
   return value;
 }
 
+function isMissingSerialDeviceError(error) {
+  if (!error) return false;
+  const candidates = [error, error.cause].filter(Boolean);
+  return candidates.some((entry) => {
+    const code = typeof entry.code === 'string' ? entry.code.toUpperCase() : '';
+    const errno = typeof entry.errno === 'number' ? entry.errno : null;
+    const message = String(entry.message || '').toLowerCase();
+    return (
+      code === 'ENOENT' ||
+      code === 'ENODEV' ||
+      errno === -2 ||
+      message.includes('no such file or directory') ||
+      message.includes('cannot open /dev/')
+    );
+  });
+}
+
 function hsvToRgb(h, s, v) {
   const hh = ((h % 360) + 360) % 360;
   const c = v * s;
@@ -142,6 +159,18 @@ class LedUartClient {
     this.inFlight = null;
   }
 
+  disableUntilRestart(reason, error = null) {
+    if (!this.enabled) return;
+    const details = error && error.message ? ` (${error.message})` : '';
+    console.warn('[LED]', `${reason}. LED UART disabled until app restart${details}.`);
+    this.enabled = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.stop();
+  }
+
   scheduleReconnect() {
     if (this.reconnectTimer || !this.enabled) return;
     this.reconnectTimer = setTimeout(() => {
@@ -175,6 +204,10 @@ class LedUartClient {
     port.open((err) => {
       if (err) {
         console.warn('[LED]', `Failed to open ${this.portPath}@${this.baudRate}:`, err.message);
+        if (isMissingSerialDeviceError(err)) {
+          this.disableUntilRestart('LED controller not found', err);
+          return;
+        }
         this.port = null;
         this.connected = false;
         this.scheduleReconnect();

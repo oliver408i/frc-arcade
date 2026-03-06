@@ -95,9 +95,12 @@ function createScreensaver({
     autoAdvanceTimeoutId: null,
     bufferCanvas: null,
     bufferCtx: null,
+    pageCanvas: null,
+    pageCtx: null,
     transitionDuration: transitionDurationMs,
     transitionFrameRequest: null,
     transitionResolve: null,
+    transitionToken: 0,
   };
 
   function ensureBufferCanvas() {
@@ -106,6 +109,30 @@ function createScreensaver({
       state.bufferCtx = state.bufferCanvas.getContext('2d');
     }
     return state.bufferCtx;
+  }
+
+  function ensurePageCanvas() {
+    if (!state.pageCanvas) {
+      state.pageCanvas = document.createElement('canvas');
+      state.pageCtx = state.pageCanvas.getContext('2d');
+    }
+    return state.pageCtx;
+  }
+
+  function syncCanvasSize() {
+    const overlayRect = overlay.getBoundingClientRect();
+    const targetWidth = Math.max(1, Math.round(overlayRect.width || window.innerWidth || state.canvas.width || 1));
+    const targetHeight = Math.max(
+      1,
+      Math.round(overlayRect.height || window.innerHeight || state.canvas.height || 1)
+    );
+    if (state.canvas.width !== targetWidth || state.canvas.height !== targetHeight) {
+      state.canvas.width = targetWidth;
+      state.canvas.height = targetHeight;
+      state.canvas.style.width = `${targetWidth}px`;
+      state.canvas.style.height = `${targetHeight}px`;
+    }
+    return { targetWidth, targetHeight };
   }
 
   function captureCurrentFrame() {
@@ -129,6 +156,7 @@ function createScreensaver({
   }
 
   function cancelTransitionAnimation() {
+    state.transitionToken += 1;
     if (state.transitionFrameRequest) {
       cancelAnimationFrame(state.transitionFrameRequest);
       state.transitionFrameRequest = null;
@@ -161,9 +189,15 @@ function createScreensaver({
         return;
       }
       const duration = state.transitionDuration;
-      const startTime = performance.now();
+      const transitionToken = state.transitionToken + 1;
+      state.transitionToken = transitionToken;
+      let startTime = null;
       state.transitionResolve = resolve;
       const step = (now) => {
+        if (transitionToken !== state.transitionToken) return;
+        if (startTime === null) {
+          startTime = now;
+        }
         const progress = Math.min((now - startTime) / duration, 1);
         drawCompositeFrame(prevFrame, nextFrame, progress);
         if (progress < 1 && state.active) {
@@ -176,9 +210,7 @@ function createScreensaver({
           }
         }
       };
-      // Draw initial state immediately to avoid any frame showing the next page before fade starts.
-      step(startTime);
-      if (state.transitionFrameRequest === null && state.active && state.transitionResolve) {
+      if (state.active && state.transitionResolve) {
         state.transitionFrameRequest = requestAnimationFrame(step);
       }
     });
@@ -205,11 +237,8 @@ function createScreensaver({
     return state.pdfDocPromise;
   }
 
-  function getScaledViewport(page) {
+  function getScaledViewport(page, targetWidth, targetHeight) {
     const baseViewport = page.getViewport({ scale: 1 });
-    const overlayRect = overlay.getBoundingClientRect();
-    const targetWidth = overlayRect.width || window.innerWidth || baseViewport.width;
-    const targetHeight = overlayRect.height || window.innerHeight || baseViewport.height;
     const scale = Math.min(targetWidth / baseViewport.width, targetHeight / baseViewport.height) || 1;
     return page.getViewport({ scale });
   }
@@ -219,27 +248,33 @@ function createScreensaver({
     const doc = await ensurePdfDocument();
     if (!doc) return;
     const clampedPage = Math.min(Math.max(pageNumber, 1), doc.numPages);
+    const { targetWidth, targetHeight } = syncCanvasSize();
     const prevFrame =
       state.transitionDuration && state.canvas.width && state.canvas.height
         ? captureCurrentFrame()
         : null;
     const page = await doc.getPage(clampedPage);
     state.currentPage = clampedPage;
-    const viewport = getScaledViewport(page);
-    const bufferCtx = ensureBufferCanvas();
-    const bufferCanvas = state.bufferCanvas;
-    bufferCanvas.width = viewport.width;
-    bufferCanvas.height = viewport.height;
+    const viewport = getScaledViewport(page, targetWidth, targetHeight);
+    const pageCtx = ensurePageCanvas();
+    const pageCanvas = state.pageCanvas;
+    pageCanvas.width = viewport.width;
+    pageCanvas.height = viewport.height;
     try {
-      await page.render({ canvasContext: bufferCtx, viewport }).promise;
+      await page.render({ canvasContext: pageCtx, viewport }).promise;
     } catch (error) {
       console.error('Failed to render screensaver page:', error);
       return;
     }
-    state.canvas.width = viewport.width;
-    state.canvas.height = viewport.height;
-    state.canvas.style.width = `${viewport.width}px`;
-    state.canvas.style.height = `${viewport.height}px`;
+    const bufferCtx = ensureBufferCanvas();
+    const bufferCanvas = state.bufferCanvas;
+    bufferCanvas.width = targetWidth;
+    bufferCanvas.height = targetHeight;
+    bufferCtx.fillStyle = '#000';
+    bufferCtx.fillRect(0, 0, targetWidth, targetHeight);
+    const drawX = Math.round((targetWidth - viewport.width) / 2);
+    const drawY = Math.round((targetHeight - viewport.height) / 2);
+    bufferCtx.drawImage(pageCanvas, drawX, drawY);
     const nextFrame = snapshotCanvas(bufferCanvas);
     await applyTransition(prevFrame, nextFrame || bufferCanvas);
   }

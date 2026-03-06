@@ -4680,12 +4680,23 @@ function applyCameraShake(delta) {
   }
 }
 
+function isScreensaverVisible() {
+  return !!(screensaverOverlay && screensaverOverlay.classList.contains('visible'));
+}
+
+function shouldPauseSceneWork() {
+  return isScreensaverVisible() || startMenuVisible || menuOpen;
+}
+
 function animate() {
   requestAnimationFrame(animate);
   updateGamepads();
   const delta = clock.getDelta();
   handleGamepadMenus();
   updatePanoCrosshairVisibility();
+  if (shouldPauseSceneWork()) {
+    return;
+  }
   updatePanoHeatmapSampling(delta);
 
   if (currentGame === 'joust') {
