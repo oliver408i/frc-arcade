@@ -752,7 +752,7 @@ app.whenReady().then(() => {
     app.quit();
     return;
   }
-  sleepBlockerId = powerSaveBlocker.start('prevent-app-suspension');
+  sleepBlockerId = powerSaveBlocker.start('prevent-display-sleep');
   ledUartClient.start();
   createWindow();
 });
