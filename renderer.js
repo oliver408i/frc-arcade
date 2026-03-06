@@ -1,6 +1,7 @@
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
+const { ipcRenderer } = require('electron');
 const THREE = require('three');
 global.THREE = THREE;
 const { EffectComposer } = require('three/addons/postprocessing/EffectComposer.js');
@@ -12,6 +13,8 @@ const constants = require('./renderer/modules/constants');
 const dom = require('./renderer/modules/dom');
 const fsPromises = fs.promises;
 const PANO_OBJECTS_DIR = path.join(__dirname, 'data', 'pano-objects');
+const PANO_HEATMAP_DIR = path.join(__dirname, 'data', 'pano-heatmaps');
+const PANO_HEATMAP_OBJECTS_DIR = path.join(PANO_HEATMAP_DIR, 'objects');
 const createScreensaver = require('./renderer/modules/screensaver');
 const sceneSetup = require('./renderer/modules/scene');
 let gazeModulePromise = null;
@@ -70,6 +73,9 @@ const {
   aiIndicator,
   startMenu,
   startMenuButtons,
+  startMenuGuideTitle,
+  startMenuGuideList,
+  startMenuGuideNote,
   gazePaddleButton,
   controlBlocks,
   gazePanel,
@@ -110,12 +116,19 @@ const {
   panoFoundPanel,
   panoHighlightOverlay,
   panoHighlightCanvas,
+  panoHeatmapOverlay,
+  panoHeatmapCanvas,
+  panoHeatmapControls,
+  panoHeatmapModeButton,
+  panoHeatmapObjectSelect,
+  panoCrosshair,
   panoResetButton,
   panoRechooseButton,
 } = dom;
 
 const panoDevOverlayCtx = panoDevOverlayCanvas ? panoDevOverlayCanvas.getContext('2d') : null;
 const panoHighlightOverlayCtx = panoHighlightCanvas ? panoHighlightCanvas.getContext('2d') : null;
+const panoHeatmapCtx = panoHeatmapCanvas ? panoHeatmapCanvas.getContext('2d') : null;
 let effectComposer = null;
 let postRenderPass = null;
 let postSSAOPass = null;
@@ -123,11 +136,55 @@ let postBloomPass = null;
 let postSMAPass = null;
 let currentGame = null;
 
+function ledSetMode(mode) {
+  if (!ipcRenderer) return;
+  ipcRenderer.send('led:set-mode', { mode });
+}
+
+function ledEmitEvent(type, data = {}) {
+  if (!ipcRenderer) return;
+  ipcRenderer.send('led:event', { type, data });
+}
+
+function getLedModeForState() {
+  if (startMenuVisible || menuOpen) return 'idle';
+  if (currentGame === 'joust') return 'joust';
+  if (currentGame === 'shooter') return 'shooter';
+  if (currentGame === 'pano') return 'pano';
+  return 'idle';
+}
+
+function syncLedMode() {
+  ledSetMode(getLedModeForState());
+}
+
 const isDebugMode = process.env.NODE_ENV === 'development';
 
 const panoHighlightState = {
   active: false,
   item: null,
+};
+const PANO_HEATMAP_GRID_WIDTH = 96;
+const PANO_HEATMAP_GRID_HEIGHT = 32;
+const PANO_HEATMAP_GRID_SIZE = PANO_HEATMAP_GRID_WIDTH * PANO_HEATMAP_GRID_HEIGHT;
+const PANO_HEATMAP_SAMPLE_INTERVAL = 0.1;
+const PANO_HEATMAP_SAVE_INTERVAL = 8;
+const panoHeatmapState = {
+  loaded: false,
+  loadingPromise: null,
+  savingPromise: null,
+  dirtyOverall: false,
+  dirtyObjectIds: new Set(),
+  sampleElapsed: 0,
+  saveElapsed: 0,
+  overlayMode: 'off',
+  selectedObjectId: null,
+  overall: new Float32Array(PANO_HEATMAP_GRID_SIZE),
+  perObject: new Map(),
+};
+const panoTimerState = {
+  active: false,
+  elapsed: 0,
 };
 
 const panoDevState = {
@@ -158,10 +215,167 @@ const LIGHT_SWITCH_AMBIENT_INTENSITY = 4.5;
 const LIGHT_SWITCH_ID = 'light-switch';
 let isLightSwitchBright = false;
 
+const START_MENU_GUIDES = {
+  default: {
+    title: 'FRC ARCADE',
+    items: [
+      { label: 'Selection', text: 'Use ↑/↓ or the left stick to highlight a mode.' },
+      { label: 'Continue', text: 'Click or press Enter / controller A / Start once you choose.' },
+    ],
+    note: 'Guides update per mode when highlighted.',
+  },
+  joust: {
+    title: 'Robot Joust',
+    items: [
+      {
+        label: 'Controls',
+        text: 'P1 uses W/A/S/D plus Q/E, P2 uses I/J/K/L plus U/O, or plug in gamepads to use analog sticks and LB/RB (or the right stick) for turning.',
+      },
+      {
+        label: 'How to play',
+        text: "Smack the opponent's bumper to score; each hit starts a new round until someone reaches the win score.",
+      },
+      {
+        label: 'Settings',
+        text: 'ESC → Settings toggles AI pilots and difficulty for either slot without leaving the arena.',
+      },
+      {
+        label: 'Inputs',
+        text: 'Best with keyboards or paired controllers; trackpads are awkward for dual inputs.',
+      },
+    ],
+    note: 'Press Enter, click, or controller A / Start to jump in.',
+  },
+  shooter: {
+    title: 'Driver + Gunner Shooter',
+    items: [
+      {
+        label: 'Controls',
+        text: 'Driver reuses P1 keys while the gunner turns the turret with J/L and fires with I; two controllers let each role use sticks plus LB/RB or triggers.',
+      },
+      {
+        label: 'How to play',
+        text: 'Dodge incoming spheres and shoot them before they hit your base; waves grow harder as your score increases.',
+      },
+      {
+        label: 'Settings',
+        text: 'ESC opens settings to hand either seat over to AI or adjust AI difficulty mid-run.',
+      },
+      {
+        label: 'Inputs',
+        text: 'Keyboard + second key set works, but matched gamepads make dual control much easier; trackpads are unnecessary.',
+      },
+    ],
+    note: 'Hit Enter, click, or controller A / Start to begin the shooter.',
+  },
+  pano: {
+    title: 'Find the Object Panorama',
+    items: [
+      {
+        label: 'Controls',
+        text: 'Click-and-drag or use P1 left stick to pan, scroll or P1 right stick up/down to zoom, and click or press A to mark the suspected object; the light switch inside the scene brightens the view.',
+      },
+      {
+        label: 'How to play',
+        text: 'Choose an object, scan the panorama, then click the matching spot to mark it before resetting or rechoosing.',
+      },
+      {
+        label: 'Settings',
+        text: 'ESC only adjusts global settings—use the on-screen reset and the light switch for fine control.',
+      },
+      {
+        label: 'Inputs',
+        text: 'Mouse/trackpad is most precise, but P1 controller works too: left stick pans, right stick up/down zooms, and A checks the center reticle.',
+      },
+    ],
+    note: 'Click the entry or press Enter / controller A / Start to begin searching.',
+  },
+  gaze: {
+    title: 'Gaze Calibration',
+    items: [
+      {
+        label: 'Controls',
+        text: 'Look at each dot and press Space or controller A when it steadies; press R during tracking to recalibrate.',
+      },
+      {
+        label: 'How to play',
+        text: 'Grant webcam access, follow each calibration dot, and wait for tracking readiness before launching other gaze modes.',
+      },
+      {
+        label: 'Settings',
+        text: 'Use Load Saved Calibration for testing while ESC keeps AI toggles independent.',
+      },
+      {
+        label: 'Inputs',
+        text: 'Webcam plus keyboard/trackpad or controller A confirms to the dots; eye movement controls the rest.',
+      },
+    ],
+    note: 'Press Enter, click, or controller A / Start after tracking is ready to continue.',
+  },
+  gazePaddle: {
+    title: 'Gaze Paddle',
+    items: [
+      {
+        label: 'Controls',
+        text: 'Look left/right to steer the paddle once tracking is active; controller buttons can acknowledge prompts.',
+      },
+      {
+        label: 'How to play',
+        text: 'Keep the glowing ball bouncing with smooth gaze shifts; misses register in the HUD.',
+      },
+      {
+        label: 'Settings',
+        text: 'Finish calibration first—ESC exits, R requests recalibration, and settings persist across sessions.',
+      },
+      {
+        label: 'Inputs',
+        text: 'The gameplay is gaze-driven; controllers only help confirm popups.',
+      },
+    ],
+    note: 'Click the highlighted mode or press Enter / controller A / Start to open Gaze Paddle once calibration is ready.',
+  },
+  gazeRunner: {
+    title: 'Gaze Lane Runner (Legacy)',
+    items: [
+      {
+        label: 'Controls',
+        text: 'Look toward lanes to switch and avoid robots while keeping your gaze steady.',
+      },
+      {
+        label: 'How to play',
+        text: 'Glance ahead to steer the runner down the lane and dodge obstacles; calm gaze = smoother flight.',
+      },
+      {
+        label: 'Settings',
+        text: 'Gaze calibration unlocks this legacy mode—ESC pauses, R recalibrates during setup.',
+      },
+      {
+        label: 'Inputs',
+        text: 'Eyes do the movement; controllers only handle menu confirmations.',
+      },
+    ],
+    note: 'Use Enter, click, or controller A / Start after highlighting this legacy mode.',
+  },
+};
+
 function getDifficultyPriority(label) {
   const key = (label || '').trim().toLowerCase();
   const index = DIFFICULTY_ORDER.indexOf(key);
   return index === -1 ? DIFFICULTY_ORDER.length : index;
+}
+
+function updateStartMenuGuide(button = startMenuButtons[startMenuIndex]) {
+  if (!startMenuGuideTitle || !startMenuGuideList || !startMenuGuideNote) return;
+  const guideKey = button?.dataset?.game;
+  const guide = START_MENU_GUIDES[guideKey] || START_MENU_GUIDES.default;
+  startMenuGuideTitle.textContent = guide.title;
+  startMenuGuideList.innerHTML = '';
+  guide.items.forEach((item) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="guide-label">${item.label}</span> ${item.text}`;
+    startMenuGuideList.appendChild(li);
+  });
+  startMenuGuideNote.textContent = guide.note;
 }
 
 if (!isDebugMode) {
@@ -437,14 +651,18 @@ const panoState = {
   fov: 55,
   dragging: false,
   selectionVisible: false,
+  selectionIndex: 0,
   clickCandidate: false,
   pointerDownX: 0,
   pointerDownY: 0,
 };
 const PANO_RADIUS = 46;
-const PANO_MIN_FOV = 12;
+const PANO_MIN_FOV = 6;
 const PANO_MAX_FOV = 80;
+const PANO_DEFAULT_FOV = 55;
 const PANO_DRAG_SPEED = 0.0026;
+const PANO_GAMEPAD_LOOK_SPEED = 1.9;
+const PANO_GAMEPAD_ZOOM_SPEED = 46;
 const PANO_PITCH_LIMIT = Math.PI / 2 - 0.12;
 const PANO_IMAGE_ASPECT = 14360 / 3628;
 const PANO_ARC = Math.PI * 0.85;
@@ -919,6 +1137,7 @@ function openMenu() {
   clearMovementInputs();
   refreshGazePaddleCanvas();
   panoState.dragging = false;
+  syncLedMode();
 }
 
 function closeMenu() {
@@ -933,6 +1152,7 @@ function closeMenu() {
   if (currentGame === 'pano') {
     renderer.domElement.style.cursor = 'grab';
   }
+  syncLedMode();
 }
 
 function toggleMenu() {
@@ -1120,16 +1340,20 @@ function handlePanoWheel(event) {
   event.preventDefault();
 }
 
-function getPanoUVFromEvent(event) {
+function getPanoUVFromClientPosition(clientX, clientY) {
   if (!panoState.mesh) return null;
   const rect = renderer.domElement.getBoundingClientRect();
   if (!rect.width || !rect.height) return null;
-  panoPointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  panoPointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  panoPointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  panoPointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(panoPointer, camera);
   const hits = raycaster.intersectObject(panoState.mesh, false);
   if (!hits.length) return null;
   return hits[0].uv || null;
+}
+
+function getPanoUVFromEvent(event) {
+  return getPanoUVFromClientPosition(event.clientX, event.clientY);
 }
 
 renderer.domElement.addEventListener('mousedown', handlePanoPointerDown);
@@ -1151,6 +1375,20 @@ if (panoResetButton) {
     if (currentGame === 'pano') {
       resetPanoSearch();
     }
+  });
+}
+
+if (panoHeatmapModeButton) {
+  panoHeatmapModeButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    cyclePanoHeatmapMode();
+  });
+}
+
+if (panoHeatmapObjectSelect) {
+  panoHeatmapObjectSelect.addEventListener('change', () => {
+    panoHeatmapState.selectedObjectId = panoHeatmapObjectSelect.value || null;
+    updatePanoHeatmapControlsUI();
   });
 }
 
@@ -1386,6 +1624,217 @@ function setScoreboardText(left, center, right) {
   p2ScoreEl.textContent = right;
 }
 
+function formatElapsed(seconds) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safe / 60);
+  const secs = safe % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function stopPanoTimer({ reset = true } = {}) {
+  panoTimerState.active = false;
+  if (reset) {
+    panoTimerState.elapsed = 0;
+  }
+}
+
+function updatePanoTimerScoreboard() {
+  const target = panoObjectsState.targetItem;
+  if (!target) return;
+  setScoreboardText(
+    target.name.toUpperCase(),
+    `TIME ${formatElapsed(panoTimerState.elapsed)}`,
+    `DIFFICULTY — ${(target.difficulty || 'UNKNOWN').toUpperCase()}`
+  );
+}
+
+function startPanoTimer() {
+  panoTimerState.elapsed = 0;
+  panoTimerState.active = true;
+  updatePanoTimerScoreboard();
+}
+
+function createEmptyHeatmap() {
+  return new Float32Array(PANO_HEATMAP_GRID_SIZE);
+}
+
+function getHeatmapObjectPath(objectId) {
+  return path.join(PANO_HEATMAP_OBJECTS_DIR, `${objectId}.json`);
+}
+
+function serializeHeatmapBuffer(buffer) {
+  return {
+    version: 1,
+    width: PANO_HEATMAP_GRID_WIDTH,
+    height: PANO_HEATMAP_GRID_HEIGHT,
+    data: Array.from(buffer),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function deserializeHeatmapBuffer(payload) {
+  if (!payload || payload.width !== PANO_HEATMAP_GRID_WIDTH || payload.height !== PANO_HEATMAP_GRID_HEIGHT) {
+    return createEmptyHeatmap();
+  }
+  const source = Array.isArray(payload.data) ? payload.data : [];
+  const target = createEmptyHeatmap();
+  for (let i = 0; i < target.length; i += 1) {
+    const value = Number(source[i]);
+    target[i] = Number.isFinite(value) && value > 0 ? value : 0;
+  }
+  return target;
+}
+
+async function loadPanoHeatmaps() {
+  if (panoHeatmapState.loaded) return;
+  if (panoHeatmapState.loadingPromise) return panoHeatmapState.loadingPromise;
+  panoHeatmapState.loadingPromise = (async () => {
+    try {
+      await fsPromises.mkdir(PANO_HEATMAP_OBJECTS_DIR, { recursive: true });
+      try {
+        const rawOverall = await fsPromises.readFile(path.join(PANO_HEATMAP_DIR, 'overall.json'), 'utf-8');
+        panoHeatmapState.overall = deserializeHeatmapBuffer(JSON.parse(rawOverall));
+      } catch {
+        panoHeatmapState.overall = createEmptyHeatmap();
+      }
+      panoHeatmapState.perObject.clear();
+      const entries = await fsPromises.readdir(PANO_HEATMAP_OBJECTS_DIR, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+        const objectId = path.basename(entry.name, '.json');
+        try {
+          const raw = await fsPromises.readFile(path.join(PANO_HEATMAP_OBJECTS_DIR, entry.name), 'utf-8');
+          panoHeatmapState.perObject.set(objectId, deserializeHeatmapBuffer(JSON.parse(raw)));
+        } catch (error) {
+          console.warn('[PanoHeatmap]', 'Failed to read object heatmap', objectId, error);
+        }
+      }
+    } catch (error) {
+      console.error('[PanoHeatmap]', 'Load failed', error);
+    } finally {
+      panoHeatmapState.loaded = true;
+      panoHeatmapState.loadingPromise = null;
+      refreshPanoHeatmapObjectSelect();
+      updatePanoHeatmapControlsUI();
+    }
+  })();
+  return panoHeatmapState.loadingPromise;
+}
+
+function getObjectHeatmap(objectId) {
+  if (!objectId) return null;
+  let map = panoHeatmapState.perObject.get(objectId);
+  if (!map) {
+    map = createEmptyHeatmap();
+    panoHeatmapState.perObject.set(objectId, map);
+  }
+  return map;
+}
+
+async function flushPanoHeatmaps() {
+  if (!panoHeatmapState.loaded) return;
+  if (!panoHeatmapState.dirtyOverall && panoHeatmapState.dirtyObjectIds.size === 0) return;
+  if (panoHeatmapState.savingPromise) return panoHeatmapState.savingPromise;
+  const dirtyObjectIds = Array.from(panoHeatmapState.dirtyObjectIds);
+  const saveOverall = panoHeatmapState.dirtyOverall;
+  panoHeatmapState.dirtyOverall = false;
+  panoHeatmapState.dirtyObjectIds.clear();
+  panoHeatmapState.savingPromise = (async () => {
+    try {
+      await fsPromises.mkdir(PANO_HEATMAP_OBJECTS_DIR, { recursive: true });
+      if (saveOverall) {
+        await fsPromises.writeFile(
+          path.join(PANO_HEATMAP_DIR, 'overall.json'),
+          JSON.stringify(serializeHeatmapBuffer(panoHeatmapState.overall)),
+          'utf-8'
+        );
+      }
+      for (const objectId of dirtyObjectIds) {
+        const objectHeatmap = panoHeatmapState.perObject.get(objectId);
+        if (!objectHeatmap) continue;
+        await fsPromises.writeFile(
+          getHeatmapObjectPath(objectId),
+          JSON.stringify(serializeHeatmapBuffer(objectHeatmap)),
+          'utf-8'
+        );
+      }
+    } catch (error) {
+      console.error('[PanoHeatmap]', 'Save failed', error);
+      if (saveOverall) panoHeatmapState.dirtyOverall = true;
+      dirtyObjectIds.forEach((id) => panoHeatmapState.dirtyObjectIds.add(id));
+    } finally {
+      panoHeatmapState.savingPromise = null;
+      panoHeatmapState.saveElapsed = 0;
+    }
+  })();
+  return panoHeatmapState.savingPromise;
+}
+
+function refreshPanoHeatmapObjectSelect() {
+  if (!panoHeatmapObjectSelect) return;
+  const previous = panoHeatmapState.selectedObjectId;
+  panoHeatmapObjectSelect.innerHTML = '';
+  const items = panoObjectsState.items || [];
+  items.forEach((item) => {
+    const option = document.createElement('option');
+    option.value = item.id;
+    option.textContent = item.name.toUpperCase();
+    panoHeatmapObjectSelect.appendChild(option);
+  });
+  const fallback = (panoObjectsState.targetItem && panoObjectsState.targetItem.id) || (items[0] && items[0].id) || null;
+  panoHeatmapState.selectedObjectId = previous && items.some((item) => item.id === previous) ? previous : fallback;
+  if (panoHeatmapState.selectedObjectId) {
+    panoHeatmapObjectSelect.value = panoHeatmapState.selectedObjectId;
+  }
+}
+
+function cyclePanoHeatmapMode() {
+  if (panoHeatmapState.overlayMode === 'off') {
+    panoHeatmapState.overlayMode = 'overall';
+  } else if (panoHeatmapState.overlayMode === 'overall') {
+    panoHeatmapState.overlayMode = 'object';
+    if (!panoHeatmapState.selectedObjectId && panoObjectsState.targetItem) {
+      panoHeatmapState.selectedObjectId = panoObjectsState.targetItem.id;
+    }
+  } else {
+    panoHeatmapState.overlayMode = 'off';
+  }
+  updatePanoHeatmapControlsUI();
+}
+
+function updatePanoHeatmapControlsUI() {
+  if (!panoHeatmapModeButton || !panoHeatmapObjectSelect) return;
+  const modeLabel =
+    panoHeatmapState.overlayMode === 'overall'
+      ? 'HEATMAP: OVERALL'
+      : panoHeatmapState.overlayMode === 'object'
+        ? 'HEATMAP: OBJECT'
+        : 'HEATMAP: OFF';
+  panoHeatmapModeButton.textContent = modeLabel;
+  const showObjectSelect =
+    panoHeatmapState.overlayMode === 'object' && Boolean((panoObjectsState.items || []).length);
+  panoHeatmapObjectSelect.classList.toggle('hidden', !showObjectSelect);
+  if (showObjectSelect && panoHeatmapState.selectedObjectId) {
+    panoHeatmapObjectSelect.value = panoHeatmapState.selectedObjectId;
+  }
+}
+
+function updatePanoHeatmapControlsVisibility() {
+  if (!panoHeatmapControls) return;
+  panoHeatmapControls.classList.toggle('hidden', currentGame !== 'pano');
+}
+
+function setPanoHeatmapOverlayVisible(visible) {
+  if (!panoHeatmapOverlay) return;
+  panoHeatmapOverlay.classList.toggle('hidden', !visible);
+}
+
+function resizePanoHeatmapCanvas() {
+  if (!panoHeatmapCanvas) return;
+  panoHeatmapCanvas.width = window.innerWidth;
+  panoHeatmapCanvas.height = Math.max(window.innerHeight, 1);
+}
+
 function updateGazePaddleButton() {
   if (!gazePaddleButton) return;
   const enabled = !!gazeGameState.readyForPaddle;
@@ -1605,6 +2054,7 @@ function highlightStartButton() {
     button.classList.add('menu-focus');
     button.focus();
   }
+  updateStartMenuGuide(button);
 }
 
 function moveStartMenuSelection(direction) {
@@ -1629,8 +2079,8 @@ function updateControlHints(mode) {
     controlBlocks[0].innerHTML = `<span>Gaze Lane Runner</span>Shift your gaze toward a lane to switch · avoid incoming robots`;
     controlBlocks[1].innerHTML = `<span>Tips</span>Keep your head still · use wide gaze motions · ESC to pause`;
   } else if (mode === 'pano') {
-    controlBlocks[0].innerHTML = `<span>Panorama Hunt</span>Drag to pan · Scroll to zoom`;
-    controlBlocks[1].innerHTML = `<span>Tips</span>Use slow drags for fine search · ESC for menu`;
+    controlBlocks[0].innerHTML = `<span>Panorama Hunt</span>Drag or P1 left stick to pan · Scroll or P1 right stick (up/down) to zoom`;
+    controlBlocks[1].innerHTML = `<span>Tips</span>Click or P1 A checks center point · ESC for menu`;
   } else {
     controlBlocks[0].innerHTML = `<span>P1 (Neon Cyan)</span>Move: W A S D · Rotate: Q / E`;
     controlBlocks[1].innerHTML = `<span>P2 (Neon Magenta)</span>Move: I J K L · Rotate: U / O`;
@@ -2217,6 +2667,8 @@ async function loadPanoObjects() {
   } finally {
     panoObjectsState.loaded = true;
   }
+  refreshPanoHeatmapObjectSelect();
+  updatePanoHeatmapControlsUI();
   return panoObjectsState.items;
 }
 
@@ -2233,10 +2685,60 @@ function setPanoSelectorVisible(visible) {
   if (visible) {
     hidePanoHintCard();
     hidePanoFoundOverlay();
-    setScoreboardText('FIND THE OBJECT', 'SELECT A TARGET', '');
+    setScoreboardText('FIND THE OBJECT', 'SELECT A TARGET', 'P1 A TO SELECT');
   }
   if (panoDevSelectorSkip) {
     panoDevSelectorSkip.classList.toggle('hidden', !visible || !panoDevState.enabled);
+  }
+  setPanoCrosshairVisible(!visible && currentGame === 'pano');
+}
+
+function setPanoCrosshairVisible(visible) {
+  if (!panoCrosshair) return;
+  panoCrosshair.classList.toggle('hidden', !visible);
+}
+
+function updatePanoCrosshairVisibility() {
+  setPanoCrosshairVisible(
+    currentGame === 'pano' &&
+      panoState.active &&
+      !menuOpen &&
+      !startMenuVisible &&
+      !panoState.selectionVisible
+  );
+}
+
+function setPanoSelectorFocus(index, { scroll = true } = {}) {
+  if (!panoSelectorList) return;
+  const cards = Array.from(panoSelectorList.querySelectorAll('.pano-object-card'));
+  if (!cards.length) {
+    panoState.selectionIndex = 0;
+    return;
+  }
+  const normalized = (index + cards.length) % cards.length;
+  panoState.selectionIndex = normalized;
+  cards.forEach((card, cardIndex) => {
+    card.classList.toggle('controller-focus', cardIndex === normalized);
+  });
+  if (scroll) {
+    cards[normalized].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+function movePanoSelectorFocus(direction) {
+  if (!panoSelectorList) return;
+  const cards = panoSelectorList.querySelectorAll('.pano-object-card');
+  if (!cards.length) return;
+  setPanoSelectorFocus(panoState.selectionIndex + direction);
+}
+
+function selectFocusedPanoObject() {
+  const items = panoObjectsState.items || [];
+  if (!items.length) return;
+  const clampedIndex = THREE.MathUtils.clamp(panoState.selectionIndex, 0, items.length - 1);
+  const item = items[clampedIndex];
+  if (item) {
+    choosePanoObject(item);
   }
 }
 
@@ -2255,6 +2757,7 @@ function renderPanoSelector(items) {
   items.forEach((item) => {
     const card = document.createElement('div');
     card.className = 'pano-object-card';
+    card.dataset.itemId = item.id;
     const img = document.createElement('img');
     img.src = item.referenceImage || PANO_PLACEHOLDER_IMAGE;
     img.alt = item.name;
@@ -2279,6 +2782,8 @@ function renderPanoSelector(items) {
     card.appendChild(button);
     panoSelectorList.appendChild(card);
   });
+  const index = THREE.MathUtils.clamp(panoState.selectionIndex, 0, items.length - 1);
+  setPanoSelectorFocus(index, { scroll: false });
 }
 
 function slugifyItemId(name) {
@@ -2859,22 +3364,35 @@ function updatePanoHighlightOverlay() {
 }
 
 function resetPanoSearch() {
+  const hadTarget = Boolean(panoObjectsState.targetItem);
+  resetPanoViewport();
+  stopPanoTimer({ reset: true });
   panoObjectsState.targetItem = null;
   hidePanoFoundOverlay();
+  if (panoHeatmapState.overlayMode === 'object') {
+    panoHeatmapState.selectedObjectId = null;
+    updatePanoHeatmapControlsUI();
+  }
   showPanoSelectorOverlay();
+  if (hadTarget) {
+    ledEmitEvent('pano_reset', {});
+  }
 }
 
 function choosePanoObject(item) {
   if (!item) return;
+  resetPanoViewport();
   panoObjectsState.targetItem = item;
+  panoHeatmapState.selectedObjectId = item.id;
+  updatePanoHeatmapControlsUI();
+  startPanoTimer();
   setPanoSelectorVisible(false);
   updatePanoHintCard(item);
-  setScoreboardText(
-    item.name.toUpperCase(),
-    `DIFFICULTY — ${(item.difficulty || 'UNKNOWN').toUpperCase()}`,
-    'CLICK TO FIND'
-  );
   showCenterMessage(`Looking for ${item.name}`, 2200);
+  ledEmitEvent('pano_target_selected', {
+    objectId: item.id,
+    difficulty: item.difficulty || '',
+  });
 }
 
 function isPointInPolygon(point, polygon) {
@@ -2909,11 +3427,21 @@ function tryHandleLightSwitchToggle(point) {
 
 function handlePanoSuccess(item) {
   if (!item) return;
-  setScoreboardText(item.name.toUpperCase(), 'FOUND', (item.difficulty || '').toUpperCase());
+  stopPanoTimer({ reset: false });
+  setScoreboardText(
+    item.name.toUpperCase(),
+    `FOUND IN ${formatElapsed(panoTimerState.elapsed)}`,
+    (item.difficulty || '').toUpperCase()
+  );
   showPanoFoundOverlay(item);
+  ledEmitEvent('pano_found', {
+    objectId: item.id,
+    elapsedSeconds: panoTimerState.elapsed,
+    difficulty: item.difficulty || '',
+  });
 }
 
-function handlePanoClick(event) {
+function handlePanoClickUV(uv) {
   if (
     currentGame !== 'pano' ||
     !panoState.active ||
@@ -2927,7 +3455,6 @@ function handlePanoClick(event) {
   }
   const targetItem = panoObjectsState.targetItem;
   if (!targetItem) return;
-  const uv = getPanoUVFromEvent(event);
   if (!uv) return;
   const point = { x: uv.x, y: 1 - uv.y };
   tryHandleLightSwitchToggle(point);
@@ -2939,6 +3466,11 @@ function handlePanoClick(event) {
   } else {
     showCenterMessage('Not quite—try another spot', 1600);
   }
+}
+
+function handlePanoClick(event) {
+  const uv = getPanoUVFromEvent(event);
+  handlePanoClickUV(uv);
 }
 
 function loadPanoTexture() {
@@ -2998,12 +3530,16 @@ function ensurePanoMesh(texture) {
 function cleanupPanoGame() {
   panoState.active = false;
   panoState.dragging = false;
+  stopPanoTimer({ reset: true });
+  void flushPanoHeatmaps();
   if (panoState.mesh) {
     panoState.mesh.visible = false;
   }
   scene.fog = baseSceneFog;
   renderer.domElement.style.cursor = '';
   setPanoSelectorVisible(false);
+  setPanoCrosshairVisible(false);
+  setPanoHeatmapOverlayVisible(false);
   hidePanoHintCard();
   hidePanoFoundOverlay();
 }
@@ -3030,11 +3566,15 @@ function initPanoGame() {
   camera.up.set(0, 1, 0);
   camera.updateProjectionMatrix();
   updatePanoView(0);
-  setScoreboardText('FIND THE OBJECT', '', 'CLICK + DRAG');
-  showCenterMessage('Drag to pan, scroll to zoom', 2400);
+  setScoreboardText('FIND THE OBJECT', '', 'DRAG OR P1 STICK');
+  showCenterMessage('Drag or P1 left stick to pan, scroll or P1 right stick up/down to zoom', 2600);
+  ledEmitEvent('pano_start', {});
   updateControlHints('pano');
   updateAIUI();
   renderer.domElement.style.cursor = 'grab';
+  setPanoCrosshairVisible(true);
+  updatePanoHeatmapControlsUI();
+  void loadPanoHeatmaps();
   showPanoSelectorOverlay();
 
   loadPanoTexture()
@@ -3059,6 +3599,220 @@ function updatePanoView(delta) {
     Math.cos(panoState.pitch) * Math.cos(panoState.yaw)
   );
   camera.lookAt(panoLookDirection);
+}
+
+function updatePanoTimer(delta) {
+  if (
+    currentGame !== 'pano' ||
+    !panoState.active ||
+    !panoTimerState.active ||
+    panoState.selectionVisible ||
+    menuOpen ||
+    startMenuVisible
+  ) {
+    return;
+  }
+  panoTimerState.elapsed += delta;
+  updatePanoTimerScoreboard();
+}
+
+function getPanoCenterPoint() {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const uv = getPanoUVFromClientPosition(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5);
+  if (!uv) return null;
+  return { x: uv.x, y: 1 - uv.y };
+}
+
+function samplePanoHeatmap(point) {
+  if (!point || !panoHeatmapState.loaded) return;
+  const x = THREE.MathUtils.clamp(point.x, 0, 0.999999);
+  const y = THREE.MathUtils.clamp(point.y, 0, 0.999999);
+  const xBin = Math.floor(x * PANO_HEATMAP_GRID_WIDTH);
+  const yBin = Math.floor(y * PANO_HEATMAP_GRID_HEIGHT);
+  const index = yBin * PANO_HEATMAP_GRID_WIDTH + xBin;
+  panoHeatmapState.overall[index] += 1;
+  panoHeatmapState.dirtyOverall = true;
+  const targetId = panoObjectsState.targetItem && panoObjectsState.targetItem.id;
+  if (targetId) {
+    const objectHeatmap = getObjectHeatmap(targetId);
+    objectHeatmap[index] += 1;
+    panoHeatmapState.dirtyObjectIds.add(targetId);
+  }
+}
+
+function updatePanoHeatmapSampling(delta) {
+  if (!panoHeatmapState.loaded) return;
+  const canSample =
+    currentGame === 'pano' &&
+    panoState.active &&
+    panoState.mesh &&
+    !panoState.selectionVisible &&
+    !menuOpen &&
+    !startMenuVisible &&
+    !(panoFoundOverlay && panoFoundOverlay.classList.contains('visible'));
+  if (canSample) {
+    panoHeatmapState.sampleElapsed += delta;
+    while (panoHeatmapState.sampleElapsed >= PANO_HEATMAP_SAMPLE_INTERVAL) {
+      panoHeatmapState.sampleElapsed -= PANO_HEATMAP_SAMPLE_INTERVAL;
+      samplePanoHeatmap(getPanoCenterPoint());
+    }
+  } else {
+    panoHeatmapState.sampleElapsed = 0;
+  }
+  if (panoHeatmapState.dirtyOverall || panoHeatmapState.dirtyObjectIds.size) {
+    panoHeatmapState.saveElapsed += delta;
+    if (panoHeatmapState.saveElapsed >= PANO_HEATMAP_SAVE_INTERVAL) {
+      void flushPanoHeatmaps();
+    }
+  }
+}
+
+function getActiveHeatmapBuffer() {
+  if (panoHeatmapState.overlayMode === 'overall') {
+    return panoHeatmapState.overall;
+  }
+  if (panoHeatmapState.overlayMode === 'object') {
+    const objectId =
+      panoHeatmapState.selectedObjectId || (panoObjectsState.targetItem && panoObjectsState.targetItem.id);
+    if (!objectId) return null;
+    return panoHeatmapState.perObject.get(objectId) || null;
+  }
+  return null;
+}
+
+function updatePanoHeatmapOverlay() {
+  if (!panoHeatmapCtx || !panoHeatmapCanvas) return;
+  const canShow =
+    currentGame === 'pano' &&
+    panoState.active &&
+    panoHeatmapState.overlayMode !== 'off' &&
+    !panoState.selectionVisible;
+  const heatmap = canShow ? getActiveHeatmapBuffer() : null;
+  if (!heatmap) {
+    panoHeatmapCtx.clearRect(0, 0, panoHeatmapCanvas.width, panoHeatmapCanvas.height);
+    setPanoHeatmapOverlayVisible(false);
+    return;
+  }
+  const width = window.innerWidth;
+  const height = Math.max(window.innerHeight, 1);
+  if (panoHeatmapCanvas.width !== width || panoHeatmapCanvas.height !== height) {
+    panoHeatmapCanvas.width = width;
+    panoHeatmapCanvas.height = height;
+  } else {
+    panoHeatmapCtx.clearRect(0, 0, width, height);
+  }
+  let maxValue = 0;
+  for (let i = 0; i < heatmap.length; i += 1) {
+    if (heatmap[i] > maxValue) maxValue = heatmap[i];
+  }
+  if (maxValue <= 0) {
+    setPanoHeatmapOverlayVisible(false);
+    return;
+  }
+  for (let y = 0; y < PANO_HEATMAP_GRID_HEIGHT; y += 1) {
+    for (let x = 0; x < PANO_HEATMAP_GRID_WIDTH; x += 1) {
+      const value = heatmap[y * PANO_HEATMAP_GRID_WIDTH + x];
+      if (value <= 0) continue;
+      const intensity = value / maxValue;
+      if (intensity < 0.06) continue;
+      const projected = projectUVToScreen(
+        { x: (x + 0.5) / PANO_HEATMAP_GRID_WIDTH, y: (y + 0.5) / PANO_HEATMAP_GRID_HEIGHT },
+        width,
+        height
+      );
+      if (!projected) continue;
+      const radius = 3 + intensity * 14;
+      const hue = (1 - intensity) * 230;
+      panoHeatmapCtx.fillStyle = `hsla(${hue}, 94%, 56%, ${0.06 + intensity * 0.33})`;
+      panoHeatmapCtx.beginPath();
+      panoHeatmapCtx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+      panoHeatmapCtx.fill();
+    }
+  }
+  setPanoHeatmapOverlayVisible(true);
+}
+
+function resetPanoViewport() {
+  panoState.yaw = 0;
+  panoState.pitch = 0;
+  panoState.targetYaw = 0;
+  panoState.targetPitch = 0;
+  panoState.fov = THREE.MathUtils.clamp(PANO_DEFAULT_FOV, PANO_MIN_FOV, PANO_MAX_FOV);
+  camera.fov = panoState.fov;
+  camera.updateProjectionMatrix();
+  updatePanoView(1);
+}
+
+function updatePanoGamepadInput(delta) {
+  if (currentGame !== 'pano' || menuOpen || startMenuVisible || panoState.selectionVisible) return;
+  const padIndex = players[0] ? players[0].gamepadIndex : 0;
+  const state = getGamepadState(padIndex);
+  if (!state || !state.connected || !panoState.active || !panoState.mesh) return;
+
+  if (wasGamepadButtonPressed(padIndex, GAMEPAD_BUTTONS.B)) {
+    resetPanoSearch();
+    return;
+  }
+
+  const zoomFactor = panoState.fov / PANO_MAX_FOV;
+  const panSpeed = PANO_GAMEPAD_LOOK_SPEED * zoomFactor;
+  panoState.targetYaw -= state.leftStick.x * panSpeed * delta;
+  panoState.targetPitch -= state.leftStick.y * panSpeed * delta;
+  panoState.targetPitch = THREE.MathUtils.clamp(
+    panoState.targetPitch,
+    -PANO_PITCH_LIMIT,
+    PANO_PITCH_LIMIT
+  );
+
+  const zoomInput = state.rightStick.y;
+  if (zoomInput !== 0) {
+    panoState.fov = THREE.MathUtils.clamp(
+      panoState.fov + zoomInput * PANO_GAMEPAD_ZOOM_SPEED * delta,
+      PANO_MIN_FOV,
+      PANO_MAX_FOV
+    );
+    camera.fov = panoState.fov;
+    camera.updateProjectionMatrix();
+  }
+
+  if (wasGamepadButtonPressed(padIndex, GAMEPAD_BUTTONS.A)) {
+    if (panoFoundOverlay && panoFoundOverlay.classList.contains('visible')) {
+      resetPanoSearch();
+      return;
+    }
+    const rect = renderer.domElement.getBoundingClientRect();
+    const uv = getPanoUVFromClientPosition(rect.left + rect.width * 0.5, rect.top + rect.height * 0.5);
+    handlePanoClickUV(uv);
+  }
+}
+
+function handlePanoSelectorGamepadInput() {
+  if (
+    currentGame !== 'pano' ||
+    !panoState.selectionVisible ||
+    menuOpen ||
+    startMenuVisible
+  ) {
+    return;
+  }
+  const padIndex = players[0] ? players[0].gamepadIndex : 0;
+  const state = getGamepadState(padIndex);
+  if (!state || !state.connected) return;
+  if (state.navEvents.up || state.navEvents.left) {
+    movePanoSelectorFocus(-1);
+  }
+  if (state.navEvents.down || state.navEvents.right) {
+    movePanoSelectorFocus(1);
+  }
+  if (
+    wasGamepadButtonPressed(padIndex, GAMEPAD_BUTTONS.A) ||
+    wasGamepadButtonPressed(padIndex, GAMEPAD_BUTTONS.START)
+  ) {
+    selectFocusedPanoObject();
+  }
+  if (wasGamepadButtonPressed(padIndex, GAMEPAD_BUTTONS.B)) {
+    resetPanoSearch();
+  }
 }
 
 function computeMainCameraHeight() {
@@ -3086,6 +3840,7 @@ function showStartMenu() {
   currentGame = null;
   updatePanoDevVisibility(null);
   updatePanoResetButtonVisibility();
+  updatePanoHeatmapControlsVisibility();
   gazeGameState.useSavedCalibration = false;
   resetMainCamera();
   updateRobotVisibility();
@@ -3102,6 +3857,7 @@ function showStartMenu() {
   updateGazePaddleButton();
   updateGazeRunnerButton();
   refreshGazePaddleCanvas();
+  syncLedMode();
 }
 
 function hideStartMenu() {
@@ -3126,6 +3882,7 @@ function selectGame(gameKey) {
   currentGame = gameKey;
   updatePanoDevVisibility(gameKey);
   updatePanoResetButtonVisibility();
+  updatePanoHeatmapControlsVisibility();
   if (gameKey !== 'gaze') {
     cleanupGazeGame();
   }
@@ -3143,6 +3900,7 @@ function selectGame(gameKey) {
   updateControlHints(gameKey);
   showCenterMessage('', 0);
   updateAIUI();
+  syncLedMode();
   if (gameKey === 'joust') {
     resetMainCamera();
     startRound({ resetScores: true });
@@ -3490,6 +4248,7 @@ function initGame2() {
   game2State.active = true;
   resetGame2SpawnTimer();
   updateGame2HUD();
+  ledEmitEvent('shooter_start', {});
 }
 
 function spawnPlayerBullet() {
@@ -3544,6 +4303,7 @@ function updateGame2HUD() {
 function endGame2() {
   game2State.active = false;
   showCenterMessage('ROBOT DESTROYED', 0);
+  ledEmitEvent('shooter_game_over', {});
   setTimeout(() => {
     showStartMenu();
   }, 2200);
@@ -3656,6 +4416,7 @@ function updateGame2(delta) {
         game2State.score += 1;
         spawnImpactRing(enemy.position, 0xff6f91);
         updateGame2HUD();
+        ledEmitEvent('shooter_enemy_kill', { score: game2State.score });
         break;
       }
     }
@@ -3681,6 +4442,7 @@ function updateGame2(delta) {
       shakeTime = 0.25;
       showCenterMessage('ROBOT DAMAGED', 800);
       updateGame2HUD();
+      ledEmitEvent('shooter_base_damaged', { health: game2State.health });
       if (game2State.health <= 0) {
         endGame2();
         return;
@@ -3727,6 +4489,7 @@ function startRound({ resetScores = false } = {}) {
   roundActive = false;
   updateScoreboard();
   showCenterMessage(`ROUND ${currentRound}`, 900);
+  ledEmitEvent('joust_round_start', { round: currentRound, resetScores });
 
   nextRoundTimeout = setTimeout(() => {
     roundActive = true;
@@ -3747,6 +4510,7 @@ function endMatch(winner) {
   if (currentGame !== 'joust') return;
   roundActive = false;
   showCenterMessage(`${winner.id} WINS`, 0);
+  ledEmitEvent('joust_win', { winner: winner.id });
   matchResetTimeout = setTimeout(() => {
     showCenterMessage('NEW MATCH', 1200);
     startRound({ resetScores: true });
@@ -3765,6 +4529,14 @@ function handleHit(attacker, defender) {
   shakeTime = 0.35;
   updateScoreboard();
   showCenterMessage(`${attacker.id} HIT!`, 1000);
+  ledEmitEvent('joust_hit', {
+    attacker: attacker.id,
+    attackerScore: attacker.score,
+    defender: defender.id,
+    p1Score: players[0].score,
+    p2Score: players[1].score,
+    winScore: WIN_SCORE,
+  });
 
   if (attacker.score >= WIN_SCORE) {
     endMatch(attacker);
@@ -3913,6 +4685,8 @@ function animate() {
   updateGamepads();
   const delta = clock.getDelta();
   handleGamepadMenus();
+  updatePanoCrosshairVisibility();
+  updatePanoHeatmapSampling(delta);
 
   if (currentGame === 'joust') {
     players.forEach((player) => updatePlayer(player, delta));
@@ -3930,6 +4704,9 @@ function animate() {
     updateLaneRunner(delta);
   }
   if (currentGame === 'pano') {
+    updatePanoTimer(delta);
+    handlePanoSelectorGamepadInput();
+    updatePanoGamepadInput(delta);
     updatePanoView(delta);
   }
   updateImpactRings(delta);
@@ -3953,6 +4730,7 @@ function animate() {
     }
   }
   updatePanoDevOverlay();
+  updatePanoHeatmapOverlay();
   updatePanoHighlightOverlay();
 }
 
@@ -3978,6 +4756,7 @@ function onResize() {
   renderer.setSize(width, height);
   resizePanoDevOverlay();
   resizePanoHighlightCanvas();
+  resizePanoHeatmapCanvas();
   resizePostProcessing();
   updateGazePaddleDimensions({ preserveState: true });
 }
@@ -3996,11 +4775,13 @@ window.addEventListener('blur', () => {
 updateGazePaddleDimensions();
 resizePanoDevOverlay();
 resizePanoHighlightCanvas();
+resizePanoHeatmapCanvas();
 initPostProcessing();
 resizePostProcessing();
 loadPanoTexture().catch((error) => {
   console.warn('[Pano]', 'Preload failed', error);
 });
+void loadPanoHeatmaps();
 initScreensaverTracking();
 showStartMenu();
 animate();

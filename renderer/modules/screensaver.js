@@ -97,6 +97,7 @@ function createScreensaver({
     bufferCtx: null,
     transitionDuration: transitionDurationMs,
     transitionFrameRequest: null,
+    transitionResolve: null,
   };
 
   function ensureBufferCanvas() {
@@ -117,10 +118,24 @@ function createScreensaver({
     return snapshot;
   }
 
+  function snapshotCanvas(sourceCanvas) {
+    if (!sourceCanvas || !sourceCanvas.width || !sourceCanvas.height) return null;
+    const snapshot = document.createElement('canvas');
+    snapshot.width = sourceCanvas.width;
+    snapshot.height = sourceCanvas.height;
+    const snapshotCtx = snapshot.getContext('2d');
+    snapshotCtx.drawImage(sourceCanvas, 0, 0);
+    return snapshot;
+  }
+
   function cancelTransitionAnimation() {
     if (state.transitionFrameRequest) {
       cancelAnimationFrame(state.transitionFrameRequest);
       state.transitionFrameRequest = null;
+    }
+    if (state.transitionResolve) {
+      state.transitionResolve();
+      state.transitionResolve = null;
     }
   }
 
@@ -139,26 +154,34 @@ function createScreensaver({
 
   function applyTransition(prevFrame, nextFrame) {
     cancelTransitionAnimation();
-    if (!prevFrame || !state.transitionDuration) {
-      drawCompositeFrame(null, nextFrame, 1);
-      return;
-    }
-    const duration = state.transitionDuration;
-    const startTime = performance.now();
-    const step = (now) => {
-      const progress = Math.min((now - startTime) / duration, 1);
-      drawCompositeFrame(prevFrame, nextFrame, progress);
-      if (progress < 1 && state.active) {
-        state.transitionFrameRequest = requestAnimationFrame(step);
-      } else {
-        state.transitionFrameRequest = null;
+    return new Promise((resolve) => {
+      if (!prevFrame || !state.transitionDuration) {
+        drawCompositeFrame(null, nextFrame, 1);
+        resolve();
+        return;
       }
-    };
-    // Draw the initial state immediately to avoid a blank frame before RAF fires.
-    step(startTime);
-    if (state.transitionFrameRequest === null && state.active) {
-      state.transitionFrameRequest = requestAnimationFrame(step);
-    }
+      const duration = state.transitionDuration;
+      const startTime = performance.now();
+      state.transitionResolve = resolve;
+      const step = (now) => {
+        const progress = Math.min((now - startTime) / duration, 1);
+        drawCompositeFrame(prevFrame, nextFrame, progress);
+        if (progress < 1 && state.active) {
+          state.transitionFrameRequest = requestAnimationFrame(step);
+        } else {
+          state.transitionFrameRequest = null;
+          if (state.transitionResolve) {
+            state.transitionResolve();
+            state.transitionResolve = null;
+          }
+        }
+      };
+      // Draw initial state immediately to avoid any frame showing the next page before fade starts.
+      step(startTime);
+      if (state.transitionFrameRequest === null && state.active && state.transitionResolve) {
+        state.transitionFrameRequest = requestAnimationFrame(step);
+      }
+    });
   }
 
   function ensurePdfDocument() {
@@ -217,7 +240,8 @@ function createScreensaver({
     state.canvas.height = viewport.height;
     state.canvas.style.width = `${viewport.width}px`;
     state.canvas.style.height = `${viewport.height}px`;
-    applyTransition(prevFrame, bufferCanvas);
+    const nextFrame = snapshotCanvas(bufferCanvas);
+    await applyTransition(prevFrame, nextFrame || bufferCanvas);
   }
 
   function renderPage(pageNumber) {

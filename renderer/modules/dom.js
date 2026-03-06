@@ -15,6 +15,9 @@ const aiIndicator = document.getElementById('aiIndicator');
 const startMenu = document.getElementById('startMenu');
 const startMenuButtons = Array.from(startMenu.querySelectorAll('button[data-game]'));
 const gazePaddleButton = startMenu.querySelector('button[data-game="gazePaddle"]');
+const startMenuGuideTitle = document.getElementById('startMenuGuideTitle');
+const startMenuGuideList = document.getElementById('startMenuGuideList');
+const startMenuGuideNote = document.getElementById('startMenuGuideNote');
 const controlBlocks = Array.from(document.querySelectorAll('.controls > div'));
 const gazePanel = document.getElementById('gazePanel');
 const gazeStatus = document.getElementById('gazeStatus');
@@ -55,6 +58,12 @@ const panoDevOverlay = document.getElementById('panoDevOverlay');
 const panoDevOverlayCanvas = document.getElementById('panoDevOverlayCanvas');
 const panoHighlightOverlay = document.getElementById('panoHighlightOverlay');
 const panoHighlightCanvas = document.getElementById('panoHighlightCanvas');
+const panoHeatmapOverlay = document.getElementById('panoHeatmapOverlay');
+const panoHeatmapCanvas = document.getElementById('panoHeatmapCanvas');
+const panoHeatmapControls = document.getElementById('panoHeatmapControls');
+const panoHeatmapModeButton = document.getElementById('panoHeatmapModeButton');
+const panoHeatmapObjectSelect = document.getElementById('panoHeatmapObjectSelect');
+const panoCrosshair = document.getElementById('panoCrosshair');
 const panoResetButton = document.getElementById('panoResetButton');
 
 module.exports = {
@@ -74,6 +83,9 @@ module.exports = {
   aiIndicator,
   startMenu,
   startMenuButtons,
+  startMenuGuideTitle,
+  startMenuGuideList,
+  startMenuGuideNote,
   gazePaddleButton,
   gazeRunnerButton,
   loadGazeCalibrationButton,
@@ -113,6 +125,12 @@ module.exports = {
   panoRechooseButton,
   panoHighlightOverlay,
   panoHighlightCanvas,
+  panoHeatmapOverlay,
+  panoHeatmapCanvas,
+  panoHeatmapControls,
+  panoHeatmapModeButton,
+  panoHeatmapObjectSelect,
+  panoCrosshair,
   panoResetButton,
   panoDevOverlay,
   panoDevOverlayCanvas,

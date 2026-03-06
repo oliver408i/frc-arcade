@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "pdfjs-dist": "^5.4.449",
+    "serialport": "^12.0.0",
     "three": "^0.181.2",
     "webgazer": "^3.4.0"
   },

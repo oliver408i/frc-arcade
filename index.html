@@ -300,6 +300,33 @@
         z-index: 19;
       }
 
+      #panoHeatmapControls {
+        position: absolute;
+        top: 92px;
+        right: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 19;
+        pointer-events: auto;
+      }
+
+      #panoHeatmapControls button,
+      #panoHeatmapControls select {
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(83, 255, 210, 0.6);
+        border-radius: 10px;
+        color: #f8f7ff;
+        letter-spacing: 0.12em;
+        font-size: 0.62rem;
+        text-transform: uppercase;
+      }
+
+      #panoHeatmapControls select {
+        min-width: 210px;
+      }
+
       .pano-object-card img {
         width: 64px;
         height: 64px;
@@ -323,6 +350,15 @@
 
       .pano-object-card button:hover {
         background: rgba(83, 255, 210, 0.45);
+      }
+
+      .pano-object-card.controller-focus {
+        border-color: rgba(246, 255, 146, 0.95);
+        box-shadow: 0 0 0 2px rgba(246, 255, 146, 0.35);
+      }
+
+      .pano-object-card.controller-focus button {
+        background: rgba(246, 255, 146, 0.35);
       }
 
       .pano-object-meta {
@@ -389,6 +425,115 @@
         width: 100%;
         height: 100%;
         display: block;
+      }
+
+      #panoHeatmapOverlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 16;
+      }
+
+      #panoHeatmapOverlay canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      #panoCrosshair {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 42px;
+        height: 42px;
+        margin-left: -21px;
+        margin-top: -21px;
+        border: 2px solid rgba(246, 255, 146, 0.85);
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at center,
+          rgba(246, 255, 146, 0.1) 0%,
+          rgba(246, 255, 146, 0.04) 35%,
+          rgba(246, 255, 146, 0) 70%
+        );
+        box-shadow:
+          0 0 24px rgba(246, 255, 146, 0.32),
+          inset 0 0 10px rgba(246, 255, 146, 0.16);
+        pointer-events: none;
+        z-index: 18;
+      }
+
+      #panoCrosshair .reticle-dot {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 6px;
+        height: 6px;
+        margin-left: -3px;
+        margin-top: -3px;
+        border-radius: 50%;
+        background: rgba(246, 255, 146, 0.95);
+        box-shadow: 0 0 8px rgba(246, 255, 146, 0.8);
+      }
+
+      #panoCrosshair .reticle-h,
+      #panoCrosshair .reticle-v {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        background: rgba(246, 255, 146, 0.92);
+        box-shadow: 0 0 8px rgba(246, 255, 146, 0.45);
+      }
+
+      #panoCrosshair .reticle-h {
+        width: 26px;
+        height: 2px;
+        margin-left: -13px;
+        margin-top: -1px;
+      }
+
+      #panoCrosshair .reticle-v {
+        width: 2px;
+        height: 26px;
+        margin-left: -1px;
+        margin-top: -13px;
+      }
+
+      #panoCrosshair .reticle-h::before,
+      #panoCrosshair .reticle-h::after,
+      #panoCrosshair .reticle-v::before,
+      #panoCrosshair .reticle-v::after {
+        content: '';
+        position: absolute;
+        background: rgba(246, 255, 146, 0.92);
+      }
+
+      #panoCrosshair .reticle-h::before {
+        left: -6px;
+        top: -1px;
+        width: 4px;
+        height: 4px;
+      }
+
+      #panoCrosshair .reticle-h::after {
+        right: -6px;
+        top: -1px;
+        width: 4px;
+        height: 4px;
+      }
+
+      #panoCrosshair .reticle-v::before {
+        top: -6px;
+        left: -1px;
+        width: 4px;
+        height: 4px;
+      }
+
+      #panoCrosshair .reticle-v::after {
+        bottom: -6px;
+        left: -1px;
+        width: 4px;
+        height: 4px;
       }
 
       #panoFoundPanel {
@@ -607,6 +752,8 @@
         border-radius: 20px;
         text-align: center;
         box-shadow: 0 0 60px rgba(246, 255, 146, 0.2);
+        width: 100%;
+        max-width: min(720px, 90vw);
       }
 
       .start-panel h1 {
@@ -634,6 +781,68 @@
         letter-spacing: 0.2em;
         cursor: pointer;
         transition: background 0.2s ease, transform 0.2s ease;
+      }
+
+      .start-panel-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 18px;
+        margin-top: 16px;
+      }
+
+      .start-panel-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .guide-panels {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        text-align: left;
+      }
+
+      .guide-card {
+        background: rgba(83, 255, 210, 0.08);
+        border: 1px solid rgba(83, 255, 210, 0.35);
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 0.75rem;
+      }
+
+      .guide-card h3 {
+        margin: 0 0 6px;
+        font-size: 0.85rem;
+        letter-spacing: 0.2em;
+      }
+
+      .guide-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .guide-list li {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .guide-label {
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .guide-note {
+        font-size: 0.7rem;
+        font-style: italic;
+        opacity: 0.8;
+        margin-top: 4px;
       }
 
       .start-panel button.menu-focus,
@@ -724,16 +933,42 @@
       <div class="start-panel">
         <h1>SELECT GAME</h1>
         <p>Use ↑/↓ + Enter</p>
-        <button data-game="joust">Robot Joust</button>
-        <button data-game="shooter">Driver + Gunner Shooter</button>
-        <button data-game="pano">Find the Object Panorama</button>
-        <button data-game="gaze">Gaze Calibration</button>
-        <button data-game="gazePaddle" disabled>Gaze Paddle</button>
-        <button data-game="gazeRunner" disable class="debug-button">[LEGACY] Gaze Lane Runner</button>
-        <button id="loadGazeCalibrationButton" class="debug-button">
-          Load Saved Calibration (Debug)
-        </button>
-        <button id="screensaverDebugButton" class="debug-button">Start Screensaver (Debug)</button>
+        <div class="start-panel-grid">
+          <div class="start-panel-buttons">
+            <button data-game="joust">Robot Joust</button>
+            <button data-game="shooter">Driver + Gunner Shooter</button>
+            <button data-game="pano">Find the Object Panorama</button>
+            <button data-game="gaze">Gaze Calibration</button>
+            <button data-game="gazePaddle" disabled>Gaze Paddle</button>
+            <button data-game="gazeRunner" disable class="debug-button">
+              [LEGACY] Gaze Lane Runner
+            </button>
+            <button id="loadGazeCalibrationButton" class="debug-button">
+              Load Saved Calibration (Debug)
+            </button>
+            <button id="screensaverDebugButton" class="debug-button">
+              Start Screensaver (Debug)
+            </button>
+          </div>
+          <div class="guide-panels">
+            <div class="guide-card" id="startMenuGuide">
+              <h3 id="startMenuGuideTitle">SELECT A GAME</h3>
+              <ul id="startMenuGuideList" class="guide-list">
+                <li>
+                  <span class="guide-label">Selection</span>
+                  Use ↑/↓ or the left stick to highlight a mode.
+                </li>
+                <li>
+                  <span class="guide-label">Continue</span>
+                  Click or press Enter / controller A / Start when you’re ready.
+                </li>
+              </ul>
+              <div class="guide-note" id="startMenuGuideNote">
+                Guides update for each highlight so you can learn controls before launching a mode.
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div id="panoSelector" class="hidden">
@@ -769,6 +1004,10 @@
       </div>
       <div class="ai-indicator" id="aiIndicator">P2 MODE — HUMAN</div>
       <button id="panoResetButton" class="hidden">RESET SEARCH</button>
+      <div id="panoHeatmapControls" class="hidden">
+        <button id="panoHeatmapModeButton">HEATMAP: OFF</button>
+        <select id="panoHeatmapObjectSelect" class="hidden"></select>
+      </div>
       <div id="centerMessage"></div>
       <div class="controls">
         <div>
@@ -795,7 +1034,6 @@
           <button data-action="reset">Reset Match</button>
           <button data-action="settings-open">Settings</button>
           <button data-action="game-select">Game Select</button>
-          <button data-action="exit">Exit to Desktop</button>
           <p style="margin-top: 16px; opacity: 0.6">ESC to close</p>
         </div>
         <div class="menu-panel-content" data-panel="settings">
@@ -818,6 +1056,14 @@
     </div>
     <div id="panoHighlightOverlay" class="hidden">
       <canvas id="panoHighlightCanvas"></canvas>
+    </div>
+    <div id="panoHeatmapOverlay" class="hidden">
+      <canvas id="panoHeatmapCanvas"></canvas>
+    </div>
+    <div id="panoCrosshair" class="hidden">
+      <div class="reticle-h"></div>
+      <div class="reticle-v"></div>
+      <div class="reticle-dot"></div>
     </div>
     <div id="panoDevPanel" class="hidden">
         <h3>PANO DEV</h3>

@@ -1,7 +1,7 @@
 {
   "name": "Axial Cooling Fan",
   "difficulty": "Expert",
-  "description": "You’ve located a standard Axial Fan, the workhorse of the cooling world. In the heat of an FRC competition, these are usually zip-tied in a frantic 'last-minute' configuration to keep a motor controller or a RoboRIO from hitting thermal shutdown. It’s an Expert find in this room because its black frame and thin blades are designed to be invisible—literally blending into the shadows of the PC case or the dark underside of the workbench. If you hear it rattling, it means someone accidentally dropped a stray zip-tie tail into the blades during the last pit stop.",
+  "description": "You’ve located a standard Axial Fan, the workhorse of the cooling world. In the heat of an FRC competition, these are usually zip-tied in a frantic 'last-minute' configuration to keep a motor controller or a RoboRIO from hitting thermal shutdown. It’s an Expert find in this room because its black frame and thin blades are designed to be invisible—literally blending into the shadows. If you hear it rattling, it means someone accidentally dropped a stray zip-tie tail into the blades during the last pit stop.",
   "referenceImage": "",
   "polygons": [
     [
