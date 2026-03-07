@@ -29,7 +29,7 @@ function ensureFlappyLionDom() {
                 linear-gradient(180deg, rgba(12, 19, 37, 0.7), rgba(6, 8, 18, 0.92));
             backdrop-filter: blur(6px);
             color: #fff6d1;
-            font-family: "Trebuchet MS", "Verdana", sans-serif;
+            font-family: 'Courier New', Courier, monospace;
         }
 
         #flabbyBirdRoot.hidden {
@@ -38,9 +38,10 @@ function ensureFlappyLionDom() {
 
         #flabbyBirdRoot button {
             border: 0;
-            border-radius: 999px;
+            border-radius: 10px;
             cursor: pointer;
             font: inherit;
+            transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
         }
 
         .flappy-lion-panel {
@@ -59,6 +60,27 @@ function ensureFlappyLionDom() {
             inset: 0;
         }
 
+        #title-screen {
+            background: linear-gradient(45deg, #87CEEB, #4682B4, #87CEEB, #6BB6FF);
+            background-size: 400% 400%;
+            animation: gradientMove 8s ease infinite;
+        }
+
+        #leaderboard-screen {
+            background: linear-gradient(45deg, #2C3E50, #34495E, #2C3E50, #4A6741);
+            background-size: 400% 400%;
+            animation: gradientMove 8s ease infinite;
+        }
+
+        #countdown-screen {
+            background:
+                radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.15) 0%, transparent 50%),
+                linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 25%, #45B7D1 50%, #96CEB4 75%, #FF6B6B 100%);
+            background-size: 100% 100%, 100% 100%, 200% 200%;
+            animation: countdownShift 3s ease infinite;
+        }
+
         #title-screen,
         #leaderboard-screen,
         #countdown-screen {
@@ -70,10 +92,10 @@ function ensureFlappyLionDom() {
         .flappy-lion-shell {
             width: min(560px, calc(100% - 48px));
             padding: 32px;
-            border-radius: 24px;
-            background: rgba(8, 12, 24, 0.72);
-            border: 1px solid rgba(255, 217, 99, 0.28);
-            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+            border-radius: 18px;
+            background: rgba(0, 0, 0, 0.72);
+            border: 3px solid rgba(255, 217, 61, 0.45);
+            box-shadow: 0 0 30px rgba(255, 217, 61, 0.2);
             text-align: center;
         }
 
@@ -83,16 +105,17 @@ function ensureFlappyLionDom() {
             font-size: clamp(2.5rem, 6vw, 4.6rem);
             line-height: 0.95;
             letter-spacing: 0.08em;
-            color: #ffd75e;
-            text-shadow: 0 4px 16px rgba(255, 165, 0, 0.35);
+            color: #FFD93D;
+            text-shadow: 3px 3px 0 #7f441a, 6px 6px 0 rgba(0, 0, 0, 0.3);
         }
 
         #subtitle {
             margin: 0 0 24px;
-            color: #fff1bf;
+            color: #f8d78c;
             letter-spacing: 0.12em;
             text-transform: uppercase;
             font-size: 0.95rem;
+            text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.4);
         }
 
         #menu-buttons {
@@ -105,26 +128,32 @@ function ensureFlappyLionDom() {
         .flappy-lion-exit,
         .flappy-lion-leaderboard-button {
             padding: 14px 18px;
-            background: linear-gradient(180deg, #ffd861, #ffac32);
-            color: #362100;
+            background: linear-gradient(145deg, #FFD93D, #FFA500);
+            color: #7f441a;
             font-weight: 700;
+            text-transform: uppercase;
             letter-spacing: 0.04em;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 10px 24px rgba(255, 167, 53, 0.22);
+            box-shadow:
+                inset 2px 2px 0 rgba(255, 255, 255, 0.32),
+                inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+                4px 4px 0 #7f441a,
+                6px 6px 0 rgba(0, 0, 0, 0.2);
         }
 
         .menu-btn.selected,
         .menu-btn:hover,
         .flappy-lion-exit:hover,
         .flappy-lion-leaderboard-button:hover {
-            transform: translateY(-1px);
+            transform: translate(-1px, -1px);
             filter: brightness(1.05);
         }
 
         #controls-info {
             display: grid;
             gap: 8px;
-            color: #d4defb;
+            color: #f6df9f;
             font-size: 0.92rem;
+            text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
         }
 
         .control-row {
@@ -136,9 +165,10 @@ function ensureFlappyLionDom() {
 
         .key {
             padding: 3px 9px;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.14);
-            border: 1px solid rgba(255,255,255,0.16);
+            border-radius: 6px;
+            background: linear-gradient(145deg, #f0f0f0, #d0d0d0);
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            color: #333;
         }
 
         #leaderboard-list {
@@ -152,18 +182,18 @@ function ensureFlappyLionDom() {
             justify-content: space-between;
             gap: 24px;
             padding: 14px 18px;
-            border-radius: 16px;
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            background: linear-gradient(145deg, rgba(255, 217, 61, 0.1), rgba(255, 165, 0, 0.1));
+            border: 2px solid rgba(255, 217, 61, 0.25);
         }
 
         .mode-name {
-            color: #ffe297;
+            color: #4ECDC4;
             font-weight: 700;
         }
 
         .score-value {
-            color: #9bfad0;
+            color: #FFD93D;
             font-weight: 700;
         }
 
@@ -187,6 +217,21 @@ function ensureFlappyLionDom() {
         #countdown-text {
             font-size: 1.25rem;
             letter-spacing: 0.24em;
+        }
+
+        .flappy-lion-actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .flappy-lion-actions.spaced {
+            margin-top: 20px;
+        }
+
+        .flappy-lion-screen.hidden-screen {
+            display: none;
         }
 
         #flabbyGameScreen {
@@ -247,16 +292,29 @@ function ensureFlappyLionDom() {
         #board1,
         #board2 {
             display: block;
-            border-radius: 18px;
-            border: 2px solid rgba(255,255,255,0.16);
-            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.32);
+            border-radius: 8px;
+            border: 3px solid #7f441a;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
             background: #81d5f8;
         }
 
         .flappy-lion-footnote {
-            color: #d4defb;
+            color: #f1dfb1;
             font-size: 0.9rem;
             text-align: center;
+            letter-spacing: 0.04em;
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes countdownShift {
+            0% { background-position: 0% 0%, 0% 0%, 0% 50%; }
+            50% { background-position: 100% 100%, 100% 100%, 100% 50%; }
+            100% { background-position: 0% 0%, 0% 0%, 0% 50%; }
         }
 
         @media (max-width: 1180px) {
@@ -281,7 +339,6 @@ function ensureFlappyLionDom() {
             <div id="title-screen" class="flappy-lion-screen">
                 <div class="flappy-lion-shell">
                     <h1 id="game-title">FLAPPY LION</h1>
-                    <p id="subtitle">Arcade flight with the original sprites</p>
                     <div id="menu-buttons">
                         <button id="single-player-btn" class="menu-btn">Single Player</button>
                         <button id="two-player-btn" class="menu-btn">Two Player</button>
@@ -291,14 +348,15 @@ function ensureFlappyLionDom() {
                     </div>
                     <div id="controls-info">
                         <div class="control-row"><span class="key">W</span> Left lion flap <span class="key">I</span> Right lion flap</div>
+                        <div class="control-row"><span class="key">A / RT</span> Controller flap <span class="key">Start</span> Pause</div>
                         <div class="control-row"><span class="key">Enter</span> Select <span class="key">Esc</span> Return to arcade</div>
                     </div>
-                    <div style="margin-top:20px;">
+                    <div class="flappy-lion-actions spaced">
                         <button id="flabbyExitButton" class="flappy-lion-exit">Exit to Arcade</button>
                     </div>
                 </div>
             </div>
-            <div id="leaderboard-screen" class="flappy-lion-screen" style="display:none;">
+            <div id="leaderboard-screen" class="flappy-lion-screen hidden-screen">
                 <div class="flappy-lion-shell">
                     <h2 id="leaderboard-title">FLAPPY LION SCORES</h2>
                     <div id="leaderboard-list">
@@ -307,13 +365,13 @@ function ensureFlappyLionDom() {
                         <div class="score-entry"><span class="mode-name">AI vs AI</span><span class="score-value" id="score-ai-vs-ai">0</span></div>
                         <div class="score-entry"><span class="mode-name">Player vs AI</span><span class="score-value" id="score-player-vs-ai">0</span></div>
                     </div>
-                    <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+                    <div class="flappy-lion-actions">
                         <button id="back-to-menu-btn" class="flappy-lion-leaderboard-button">Back to Menu</button>
                         <button id="flabbyLeaderboardExitButton" class="flappy-lion-exit">Exit to Arcade</button>
                     </div>
                 </div>
             </div>
-            <div id="countdown-screen" class="flappy-lion-screen" style="display:none;">
+            <div id="countdown-screen" class="flappy-lion-screen hidden-screen">
                 <div id="countdown-content">
                     <div id="countdown-mode">Single Player</div>
                     <div id="countdown-number">3</div>
@@ -324,7 +382,6 @@ function ensureFlappyLionDom() {
                 <div class="flappy-lion-header">
                     <div class="flappy-lion-brand">
                         <h2>FLAPPY LION</h2>
-                        <p>Use the original art and audio, adapted into the arcade shell.</p>
                     </div>
                     <button id="flabbyGameExitButton" class="flappy-lion-exit">Exit to Arcade</button>
                 </div>
@@ -338,7 +395,6 @@ function ensureFlappyLionDom() {
                         <canvas id="board2"></canvas>
                     </div>
                 </div>
-                <div class="flappy-lion-footnote">Press <strong>R</strong> to restart a round. In single-player mode, only the left board is active.</div>
             </div>
         </div>
     `;
@@ -533,25 +589,31 @@ let rianbaldAnimation = {
     game2: { active: false, timer: 0, y: 0, targetY: 0 }
 };
 
-// Random Events System
+function createBossState() {
+    return {
+        bullets: [],
+        totalFired: 0,
+        spawnCooldown: 36,
+        spritePulse: 0,
+    };
+}
+
+function createRandomEventState() {
+    return {
+        active: false,
+        type: null,
+        timer: 0,
+        duration: 0,
+        originalValues: {},
+        boss: createBossState(),
+    };
+}
+
 let randomEvents = {
-    game1: {
-        active: false,
-        type: null,
-        timer: 0,
-        duration: 0,
-        originalValues: {}
-    },
-    game2: {
-        active: false,
-        type: null,
-        timer: 0,
-        duration: 0,
-        originalValues: {}
-    }
+    game1: createRandomEventState(),
+    game2: createRandomEventState(),
 };
 
-// Event types and their properties
 const EVENT_TYPES = {
     BONUS_ROUND: {
         name: "BONUS ROUND",
@@ -591,11 +653,15 @@ const EVENT_TYPES = {
     BOSS_FIGHT: {
         name: "BOSS FIGHT",
         color: "#8B0000",
-        description: "Special challenging pipe pattern!",
+        description: "RIAN fires a torrent of projectiles!",
         duration: 900, // 15 seconds
         probability: 0.08
     }
 };
+
+const BOSS_BULLET_LIMIT = 12;
+const BOSS_BULLET_RADIUS = 9;
+const BOSS_BULLET_SPRITE_SIZE = 112;
 
 //pipes (scaled up)
 let pipeWidth = 85; //scaled up from 64
@@ -898,20 +964,8 @@ function startGame(mode) {
     dayNightCycle.direction = 1;
 
     // Reset all random events
-    randomEvents.game1 = {
-        active: false,
-        type: null,
-        timer: 0,
-        duration: 0,
-        originalValues: {}
-    };
-    randomEvents.game2 = {
-        active: false,
-        type: null,
-        timer: 0,
-        duration: 0,
-        originalValues: {}
-    };
+    randomEvents.game1 = createRandomEventState();
+    randomEvents.game2 = createRandomEventState();
 
     // Hide countdown screen and show game
     document.getElementById('countdown-screen').style.display = 'none';
@@ -1333,6 +1387,22 @@ function updateGame(game) {
         }
     }
 
+    if (
+        randomEvents[gameKey].active &&
+        randomEvents[gameKey].type === 'BOSS_FIGHT' &&
+        !game.gameOver
+    ) {
+        for (const bullet of randomEvents[gameKey].boss.bullets) {
+            if (collidesWithBossBullet(game.bird, bullet)) {
+                game.gameOver = true;
+                isPaused = false;
+                playSound(sfxHit);
+                playSound(sfxDie);
+                break;
+            }
+        }
+    }
+
     //clear pipes
     while (game.pipeArray.length > 0 && game.pipeArray[0].x < -pipeWidth) {
         game.pipeArray.shift(); //removes first element from the array
@@ -1386,6 +1456,10 @@ function updateGame(game) {
     // Draw rianbald easter egg
     if (rianbaldAnimation[gameKey].active && !paused) {
         drawRianbaldEasterEgg(game, gameKey);
+    }
+
+    if (randomEvents[gameKey].active && randomEvents[gameKey].type === 'BOSS_FIGHT') {
+        drawBossFight(game, gameKey);
     }
 
     drawParticles(game, gameKey, paused);
@@ -1481,8 +1555,6 @@ function updateControllerNavigation() {
     }
 
     if (navIndex === -1) {
-        // no connected controllers available
-        // console.log("No controller connected for navigation");
         return;
     }
 
@@ -1702,25 +1774,16 @@ function updateLeaderboardHighlight() {
 }
 
 function handleGameRestart() {
-    console.log("handleGameRestart called, gameMode:", gameMode);
-    console.log("game1.gameOver:", game1.gameOver, "game1.canRestart:", game1.canRestart);
-    console.log("game2.gameOver:", game2.gameOver, "game2.canRestart:", game2.canRestart);
-    
     if (gameMode === 'SINGLE') {
         if (game1.gameOver && game1.canRestart) {
-            console.log("Restarting single player game");
             resetGame(game1);
-        } else {
-            console.log("Cannot restart single player - conditions not met");
         }
-    } else {
-        if (game1.gameOver && game2.gameOver && game1.canRestart && game2.canRestart) {
-            console.log("Restarting multiplayer game");
-            resetGame(game1);
-            resetGame(game2);
-        } else {
-            console.log("Cannot restart multiplayer - conditions not met");
-        }
+        return;
+    }
+
+    if (game1.gameOver && game2.gameOver && game1.canRestart && game2.canRestart) {
+        resetGame(game1);
+        resetGame(game2);
     }
 }
 
@@ -1746,20 +1809,8 @@ function returnToMenu() {
     baseOpeningSpace = boardHeight / 4;
 
     // Reset all random events
-    randomEvents.game1 = {
-        active: false,
-        type: null,
-        timer: 0,
-        duration: 0,
-        originalValues: {}
-    };
-    randomEvents.game2 = {
-        active: false,
-        type: null,
-        timer: 0,
-        duration: 0,
-        originalValues: {}
-    };
+    randomEvents.game1 = createRandomEventState();
+    randomEvents.game2 = createRandomEventState();
 
     // Show title screen and hide other screens
     document.getElementById('title-screen').style.display = 'flex';
@@ -1978,25 +2029,15 @@ function resetGame(game) {
     rianbaldAnimation[gameKey] = { active: false, timer: 0, y: 0, targetY: 0 };
     
     // Reset random events
-    randomEvents[gameKey] = {
-        active: false,
-        type: null,
-        timer: 0,
-        duration: 0,
-        originalValues: {}
-    };
+    randomEvents[gameKey] = createRandomEventState();
     particles[gameKey] = [];
     screenShake[gameKey] = { timer: 0, intensity: 0, duration: 0 };
 }
 
 function playSound(audio) {
     if (audio) {
-        // Reset audio to beginning and play
         audio.currentTime = 0;
-        audio.play().catch(e => {
-            // Handle autoplay restrictions gracefully
-            console.log("Audio play failed:", e);
-        });
+        audio.play().catch(() => {});
     }
 }
 
@@ -2164,7 +2205,7 @@ window.toggleAI = toggleAI;
 
 // Rianbald Easter Egg Functions
 function triggerRianbaldEasterEgg(game, triggerPipe) {
-    gameKey = game === game1 ? 'game1' : 'game2';
+    const gameKey = game === game1 ? 'game1' : 'game2';
 
     // Simple popup in center of screen
     rianbaldAnimation[gameKey].active = true;
@@ -2172,7 +2213,6 @@ function triggerRianbaldEasterEgg(game, triggerPipe) {
     rianbaldAnimation[gameKey].x = boardWidth * 0.75; // 75% to the right
     rianbaldAnimation[gameKey].y = boardHeight / 2; // Center vertically
 
-    console.log("rian triggered at score:", Math.floor(game.score));
 }
 
 function drawRianbaldEasterEgg(game, gameKey) {
@@ -2187,8 +2227,8 @@ function drawRianbaldEasterEgg(game, gameKey) {
 
     // Draw rianbald image
     if (rianbaldImg && rianbaldImg.complete) {
-        let imgWidth = 50;
-        let imgHeight = 50;
+        let imgWidth = 100;
+        let imgHeight = 100;
 
         // Simple shake effect
         let shakeX = (Math.random() - 0.5) * 4;
@@ -2259,40 +2299,135 @@ function activateRandomEvent(game, gameKey, eventType) {
     // Apply event effects
     applyEventEffect(game, gameKey, eventType);
     
-    console.log(`Random Event: ${event.name} activated for ${gameKey}!`);
 }
 
 function applyEventEffect(game, gameKey, eventType) {
     switch (eventType) {
         case 'BONUS_ROUND':
-            // Wider pipes - increase opening space
-            baseOpeningSpace = boardHeight / 3; // Increased from /4
+            baseOpeningSpace = boardHeight / 3;
             break;
-            
         case 'SPEED_BOOST':
-            // Faster pipes
-            velocityX = baseVelocityX * 1.8; //1.8
+            velocityX = baseVelocityX * 1.8;
             break;
-            
         case 'GRAVITY_SHIFT':
-            // Reduced gravity
-            gravity = 0.35; // Reduced from 0.41
+            gravity = 0.35;
             break;
-            
         case 'SCORE_MULTIPLIER':
-            // Score multiplier handled in scoring logic
             break;
-            
         case 'SHIELD_MODE':
-            // Shield mode handled in collision detection
             break;
-            
         case 'BOSS_FIGHT':
-            // Special pipe pattern - faster and more frequent
-            velocityX = baseVelocityX * 1.5;
-            currentPipeInterval = basePipeInterval * 0.7;
+            velocityX = baseVelocityX * 1.15;
+            currentPipeInterval = basePipeInterval * 0.9;
+            randomEvents[gameKey].boss = createBossState();
             break;
     }
+}
+
+function spawnBossBullet(game, gameKey) {
+    const eventData = randomEvents[gameKey];
+    const boss = eventData.boss;
+    if (boss.totalFired >= BOSS_BULLET_LIMIT) return;
+
+    const spriteSize = BOSS_BULLET_SPRITE_SIZE;
+    const bossCenterX = game.board.width - spriteSize * 0.55;
+    const bossCenterY = 110 + Math.sin(eventData.timer * 0.08) * 20;
+    const targetY = game.bird.y + game.bird.height / 2 + (Math.random() - 0.5) * 140;
+    const speed = Math.max(Math.abs(velocityX), 4.5);
+    const dx = Math.max(bossCenterX - game.bird.x, 80);
+    const dy = targetY - bossCenterY;
+    const norm = Math.max(Math.hypot(dx, dy), 1);
+
+    boss.bullets.push({
+        x: bossCenterX - 26,
+        y: bossCenterY + (Math.random() - 0.5) * 30,
+        vx: -(dx / norm) * speed,
+        vy: (dy / norm) * speed * 0.55,
+        radius: BOSS_BULLET_RADIUS + Math.random() * 2,
+    });
+    boss.totalFired += 1;
+    boss.spawnCooldown = 45 + Math.random() * 18;
+}
+
+function updateBossFight(game, gameKey) {
+    const eventData = randomEvents[gameKey];
+    const boss = eventData.boss;
+    boss.spritePulse += 0.1;
+
+    if (!isPaused && boss.totalFired < BOSS_BULLET_LIMIT) {
+        boss.spawnCooldown -= 1;
+        if (boss.spawnCooldown <= 0) {
+            spawnBossBullet(game, gameKey);
+        }
+    }
+
+    if (isPaused) return;
+
+    for (let i = boss.bullets.length - 1; i >= 0; i--) {
+        const bullet = boss.bullets[i];
+        bullet.x += bullet.vx;
+        bullet.y += bullet.vy;
+
+        if (
+            bullet.x < -40 ||
+            bullet.x > game.board.width + 40 ||
+            bullet.y < -40 ||
+            bullet.y > game.board.height + 40
+        ) {
+            boss.bullets.splice(i, 1);
+        }
+    }
+}
+
+function drawBossFight(game, gameKey) {
+    const eventData = randomEvents[gameKey];
+    const boss = eventData.boss;
+    const pulse = 1 + Math.sin(boss.spritePulse) * 0.04;
+    const spriteWidth = BOSS_BULLET_SPRITE_SIZE * pulse;
+    const spriteHeight = BOSS_BULLET_SPRITE_SIZE * pulse;
+    const spriteX = game.board.width - spriteWidth - 12;
+    const spriteY = 56 + Math.sin(eventData.timer * 0.08) * 20;
+
+    if (rianbaldImg && rianbaldImg.complete) {
+        game.context.save();
+        game.context.globalAlpha = 0.95;
+        game.context.shadowColor = 'rgba(255, 88, 88, 0.85)';
+        game.context.shadowBlur = 18;
+        game.context.drawImage(rianbaldImg, spriteX, spriteY, spriteWidth, spriteHeight);
+        game.context.restore();
+    }
+
+    for (const bullet of boss.bullets) {
+        const gradient = game.context.createRadialGradient(
+            bullet.x,
+            bullet.y,
+            2,
+            bullet.x,
+            bullet.y,
+            bullet.radius * 1.8
+        );
+        gradient.addColorStop(0, '#fff0a6');
+        gradient.addColorStop(0.45, '#ff8b5c');
+        gradient.addColorStop(1, 'rgba(139, 0, 0, 0.1)');
+        game.context.fillStyle = gradient;
+        game.context.beginPath();
+        game.context.arc(bullet.x, bullet.y, bullet.radius * 1.8, 0, Math.PI * 2);
+        game.context.fill();
+
+        game.context.fillStyle = '#8b0000';
+        game.context.beginPath();
+        game.context.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+        game.context.fill();
+    }
+}
+
+function collidesWithBossBullet(bird, bullet) {
+    const centerX = bird.x + bird.width / 2;
+    const centerY = bird.y + bird.height / 2;
+    const dx = centerX - bullet.x;
+    const dy = centerY - bullet.y;
+    const hitRadius = Math.max(bird.width, bird.height) * 0.34 + bullet.radius;
+    return dx * dx + dy * dy <= hitRadius * hitRadius;
 }
 
 function updateRandomEvent(game, gameKey) {
@@ -2300,21 +2435,20 @@ function updateRandomEvent(game, gameKey) {
     
     if (eventData.active) {
         eventData.timer++;
+        if (eventData.type === 'BOSS_FIGHT') {
+            updateBossFight(game, gameKey);
+        }
         
-        // Check if event should end
         if (eventData.timer >= eventData.duration) {
             endRandomEvent(game, gameKey);
         }
-        
-        // Draw event indicator
+
         drawEventIndicator(game, gameKey);
     }
 }
 
 function endRandomEvent(game, gameKey) {
     const eventData = randomEvents[gameKey];
-    const event = EVENT_TYPES[eventData.type];
-    
     // Restore original values
     velocityX = eventData.originalValues.velocityX;
     gravity = eventData.originalValues.gravity;
@@ -2327,8 +2461,7 @@ function endRandomEvent(game, gameKey) {
     eventData.timer = 0;
     eventData.duration = 0;
     eventData.originalValues = {};
-    
-    console.log(`Random Event: ${event.name} ended for ${gameKey}!`);
+    eventData.boss = createBossState();
 }
 
 function drawEventIndicator(game, gameKey) {
@@ -2382,70 +2515,11 @@ function detectCollisionWithShield(a, b, game, gameKey) {
 
 // Gamepad handling functions
 function handleGamepadConnected(event) {
-    console.log("Gamepad connected:", event.gamepad.id);
-    console.log("Gamepad index:", event.gamepad.index);
-    console.log("Gamepad buttons:", event.gamepad.buttons.length);
-    
-    // Assign first controller to gamepad, second to gamepad2
-    if (!gamepadConnected) {
-        gamepadConnected = true;
-        gamepadIndex = event.gamepad.index;
-        console.log("Controller 1 assigned to Player 1, index:", gamepadIndex);
-    } else if (!gamepad2Connected) {
-        gamepad2Connected = true;
-        gamepad2Index = event.gamepad.index;
-        console.log("Controller 2 assigned to Player 2, index:", gamepad2Index);
-    }
+    syncConnectedGamepads();
 }
 
 function handleGamepadDisconnected(event) {
-    console.log("Gamepad disconnected:", event.gamepad.id);
-    
-    // Check which controller was disconnected
-    if (event.gamepad.index === gamepadIndex) {
-        gamepadConnected = false;
-        gamepadIndex = -1;
-        console.log("Controller 1 disconnected");
-    } else if (event.gamepad.index === gamepad2Index) {
-        gamepad2Connected = false;
-        gamepad2Index = -1;
-        console.log("Controller 2 disconnected");
-    }
-}
-
-function checkGamepadInput() {
-    if (!isActive) return;
-    const gamepads = navigator.getGamepads();
-    
-    // Check Controller 1 (Player 1 - game1/board1)
-    if (gamepadConnected && gamepadIndex !== -1) {
-        const gamepad = gamepads[gamepadIndex];
-        if (gamepad && gamepad.buttons[1] && gamepad.buttons[1].pressed) {
-            // Only trigger jump if game is playing and game1 is not over
-            if (gameState === 'PLAYING' && !isPaused && !game1.gameOver) {
-                // Trigger jump for game1 (left side)
-                game1.velocityY = JUMP_STRENGTH;
-                game1.isFlapping = true;
-                game1.flapAnimation = 0;
-                playSound(sfxWing);
-            }
-        }
-    }
-    
-    // Check Controller 2 (Player 2 - game2/board2)
-    if (gamepad2Connected && gamepad2Index !== -1) {
-        const gamepad2 = gamepads[gamepad2Index];
-        if (gamepad2 && gamepad2.buttons[1] && gamepad2.buttons[1].pressed) {
-            // Only trigger jump if game is playing and game2 is not over
-            if (gameState === 'PLAYING' && !isPaused && !game2.gameOver && gameMode !== 'SINGLE') {
-                // Trigger jump for game2 (right side)
-                game2.velocityY = JUMP_STRENGTH;
-                game2.isFlapping = true;
-                game2.flapAnimation = 0;
-                playSound(sfxWing);
-            }
-        }
-    }
+    syncConnectedGamepads();
 }
 
 function exitToArcade() {
