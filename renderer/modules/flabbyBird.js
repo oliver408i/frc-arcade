@@ -445,9 +445,21 @@ let gamepadConnected = false;
 let gamepadIndex = -1;
 let gamepad2Connected = false;
 let gamepad2Index = -1;
-// Track last axis states per gamepad index to detect edge (not hold) for joysticks
-let lastAxisStates = {}; // { [index]: { y: 0 } }
-// Axis deadzone threshold for stick navigation
+const GAMEPAD_BUTTONS = {
+    A: 0,
+    B: 1,
+    X: 2,
+    Y: 3,
+    LB: 4,
+    RB: 5,
+    LT: 6,
+    RT: 7,
+    BACK: 8,
+    START: 9,
+    DPAD_UP: 12,
+    DPAD_DOWN: 13,
+};
+const gamepadFrameStates = {};
 const AXIS_DEADZONE = 0.45;
 
 // Controller navigation
@@ -455,8 +467,31 @@ let currentMenuIndex = 0;
 let menuButtons = ['single-player-btn', 'two-player-btn', 'ai-vs-ai-btn', 'player-vs-ai-btn', 'leaderboard-btn'];
 let leaderboardButtons = ['back-to-menu-btn'];
 let currentLeaderboardIndex = 0;
-let lastDpadState = { up: false, down: false, left: false, right: false };
-let lastButtonStates = { a: false, b: false, x: false, y: false, start: false };
+
+function getGamepadFrameState(index) {
+    if (!gamepadFrameStates[index]) {
+        gamepadFrameStates[index] = {
+            axisY: 0,
+            buttons: {},
+        };
+    }
+    return gamepadFrameStates[index];
+}
+
+function syncConnectedGamepads() {
+    const pads = Array.from(navigator.getGamepads?.() || []).filter(Boolean);
+    gamepadConnected = pads.length > 0;
+    gamepad2Connected = pads.length > 1;
+    gamepadIndex = gamepadConnected ? pads[0].index : -1;
+    gamepad2Index = gamepad2Connected ? pads[1].index : -1;
+}
+
+function isGamepadButtonPressed(gamepad, buttonIndex) {
+    const button = gamepad?.buttons?.[buttonIndex];
+    if (!button) return false;
+    if (typeof button.value === 'number' && button.value > 0.5) return true;
+    return !!button.pressed;
+}
 
 //board - responsive sizing (scaled up for bigger game)
 let boardWidth = 480; // Increased from 360
@@ -1106,20 +1141,15 @@ function update(currentTime = 0) {
         lastTime = currentTime;
         frameCount++;
         tickDayNightCycle();
+        updateControllerNavigation();
         
-        if (gameState === 'TITLE') { 
-            updateControllerNavigation();
-        } else if (gameState === 'COUNTDOWN') {
+        if (gameState === 'COUNTDOWN') {
             updateCountdown();
         } else if (gameState === 'PLAYING') {
             updateGame(game1);
             if (gameMode !== 'SINGLE') {
                 updateGame(game2);
             }
-            // Also check controller navigation during gameplay for Y button
-            updateControllerNavigation();
-        } else if (gameState === 'LEADERBOARD') {
-            updateControllerNavigation();
         }
     }
     
@@ -1192,9 +1222,6 @@ function updateGame(game) {
         updateAI(game);
     }
     
-    // Check gamepad input
-    checkGamepadInput();
-
     // Handle death animation
     if (game.gameOver && !game.deathAnimation && !paused) {
         game.deathAnimation = true;
@@ -1439,7 +1466,7 @@ function drawPauseOverlay(game) {
 // Controller navigation functions
 function updateControllerNavigation() {
     if (!isActive) return;
-    // Choose a controller to use for menu navigation. Prefer primary controller
+    syncConnectedGamepads();
     const gamepads = navigator.getGamepads();
     let navIndex = -1;
     if (gamepadIndex !== -1 && gamepads[gamepadIndex]) {
@@ -1462,34 +1489,28 @@ function updateControllerNavigation() {
     const gamepad = gamepads[navIndex];
     if (!gamepad) return;
 
-    // Handle D-pad navigation (still supported)
-    handleDpadNavigation(gamepad);
-
-    // Handle left-stick (joystick) navigation for Xbox controllers
+    handleDpadNavigation(gamepad, navIndex);
     handleStickNavigation(gamepad, navIndex);
+    handleButtonPresses(gamepad, navIndex);
 
-    // Handle button presses
-    handleButtonPresses(gamepad);
+    if (gameState === 'PLAYING' && gamepad2Index !== -1 && gamepad2Index !== navIndex) {
+        const secondGamepad = gamepads[gamepad2Index];
+        if (secondGamepad) {
+            handleButtonPresses(secondGamepad, gamepad2Index);
+        }
+    }
 }
 
-// Map left stick Y to up/down navigation with deadzone and edge detection
 function handleStickNavigation(gamepad, index) {
-    // Most standard controllers expose left stick vertical on axes[1]
     const yAxis = typeof gamepad.axes[1] === 'number' ? gamepad.axes[1] : 0;
+    const state = getGamepadFrameState(index);
+    const lastY = state.axisY;
 
-    // Initialize last state for this index if needed
-    if (!lastAxisStates[index]) lastAxisStates[index] = { y: 0 };
-
-    const lastY = lastAxisStates[index].y;
-
-    // Determine neutral vs up/down using deadzone
     const up = yAxis < -AXIS_DEADZONE;
     const down = yAxis > AXIS_DEADZONE;
-
     const wasUp = lastY < -AXIS_DEADZONE;
     const wasDown = lastY > AXIS_DEADZONE;
 
-    // Trigger on edge: when transitioning from neutral to up/down (not when holding)
     if (up && !wasUp && !wasDown) {
         if (gameState === 'TITLE') {
             currentMenuIndex = Math.max(0, currentMenuIndex - 1);
@@ -1510,17 +1531,17 @@ function handleStickNavigation(gamepad, index) {
         playSound(sfxWing);
     }
 
-    // Save last axis value for edge detection
-    lastAxisStates[index].y = yAxis;
+    state.axisY = yAxis;
 }
 
-function handleDpadNavigation(gamepad) {
-    // D-pad up/down for navigation
-    const dpadUp = gamepad.buttons[12] && gamepad.buttons[12].pressed;
-    const dpadDown = gamepad.buttons[13] && gamepad.buttons[13].pressed;
-    
-    // Only trigger on press, not hold
-    if (dpadUp && !lastDpadState.up) {
+function handleDpadNavigation(gamepad, index) {
+    const state = getGamepadFrameState(index);
+    const dpadUp = isGamepadButtonPressed(gamepad, GAMEPAD_BUTTONS.DPAD_UP);
+    const dpadDown = isGamepadButtonPressed(gamepad, GAMEPAD_BUTTONS.DPAD_DOWN);
+    const wasUp = !!state.buttons[GAMEPAD_BUTTONS.DPAD_UP];
+    const wasDown = !!state.buttons[GAMEPAD_BUTTONS.DPAD_DOWN];
+
+    if (dpadUp && !wasUp) {
         if (gameState === 'TITLE') {
             currentMenuIndex = Math.max(0, currentMenuIndex - 1);
             updateMenuHighlight();
@@ -1530,8 +1551,8 @@ function handleDpadNavigation(gamepad) {
         }
         playSound(sfxWing);
     }
-    
-    if (dpadDown && !lastDpadState.down) {
+
+    if (dpadDown && !wasDown) {
         if (gameState === 'TITLE') {
             currentMenuIndex = Math.min(menuButtons.length - 1, currentMenuIndex + 1);
             updateMenuHighlight();
@@ -1541,70 +1562,75 @@ function handleDpadNavigation(gamepad) {
         }
         playSound(sfxWing);
     }
-    
-    // Update last states
-    lastDpadState.up = dpadUp;
-    lastDpadState.down = dpadDown;
+
+    state.buttons[GAMEPAD_BUTTONS.DPAD_UP] = dpadUp;
+    state.buttons[GAMEPAD_BUTTONS.DPAD_DOWN] = dpadDown;
 }
 
-function handleButtonPresses(gamepad) {
-    const aButton = gamepad.buttons[0] && gamepad.buttons[0].pressed;
-    const bButton = gamepad.buttons[1] && gamepad.buttons[1].pressed;
-    const xButton = gamepad.buttons[2] && gamepad.buttons[2].pressed;
-    const yButton = gamepad.buttons[3] && gamepad.buttons[3].pressed;
-    const startButton = gamepad.buttons[9] && gamepad.buttons[9].pressed;
-    
-    // Debug Y button detection
-    if (yButton) {
-        console.log("Y button detected as pressed");
-    }
-    
-    // A button for menu selection
-    if (aButton && !lastButtonStates.a) {
+function handleButtonPresses(gamepad, index) {
+    const state = getGamepadFrameState(index);
+    const previousButtons = { ...state.buttons };
+    const aButton = isGamepadButtonPressed(gamepad, GAMEPAD_BUTTONS.A);
+    const bButton = isGamepadButtonPressed(gamepad, GAMEPAD_BUTTONS.B);
+    const xButton = isGamepadButtonPressed(gamepad, GAMEPAD_BUTTONS.X);
+    const yButton = isGamepadButtonPressed(gamepad, GAMEPAD_BUTTONS.Y);
+    const startButton = isGamepadButtonPressed(gamepad, GAMEPAD_BUTTONS.START);
+    const rtButton = isGamepadButtonPressed(gamepad, GAMEPAD_BUTTONS.RT);
+
+    const aPressed = aButton && !previousButtons[GAMEPAD_BUTTONS.A];
+    const bPressed = bButton && !previousButtons[GAMEPAD_BUTTONS.B];
+    const xPressed = xButton && !previousButtons[GAMEPAD_BUTTONS.X];
+    const yPressed = yButton && !previousButtons[GAMEPAD_BUTTONS.Y];
+    const startPressed = startButton && !previousButtons[GAMEPAD_BUTTONS.START];
+    const rtPressed = rtButton && !previousButtons[GAMEPAD_BUTTONS.RT];
+
+    if (aPressed || startPressed) {
         if (gameState === 'TITLE') {
             selectMenuOption();
         } else if (gameState === 'LEADERBOARD') {
             selectLeaderboardOption();
         }
     }
-    
-    // B button for back/return to menu (only in menus, not during gameplay)
-    if (bButton && !lastButtonStates.b) {
-        if (gameState === 'LEADERBOARD') {
+
+    if (bPressed) {
+        if (gameState === 'TITLE' || gameState === 'COUNTDOWN') {
+            exitToArcade();
+        } else if (gameState === 'LEADERBOARD') {
             hideLeaderboard();
-        }
-        // Note: B button during gameplay is handled in checkGamepadInput() for jumping
-    }
-    
-    // X button for return to menu during gameplay
-    if (xButton && !lastButtonStates.x) {
-        if (gameState === 'PLAYING') {
+        } else if (gameState === 'PLAYING' && isPaused) {
             returnToMenu();
         }
     }
-    
-    // Y button for restart game
-    if (yButton && !lastButtonStates.y) {
-        console.log("Y button pressed, gameState:", gameState);
-        if (gameState === 'PLAYING') {
-            console.log("Attempting restart...");
+
+    if (gameState === 'PLAYING') {
+        if (!isPaused) {
+            if (index === gamepadIndex && (aPressed || rtPressed)) {
+                attemptJump(game1);
+            }
+            if (index === gamepad2Index && gameMode !== 'SINGLE' && (aPressed || rtPressed)) {
+                attemptJump(game2);
+            }
+        }
+
+        if (xPressed) {
+            returnToMenu();
+        }
+
+        if (yPressed) {
             handleGameRestart();
         }
-    }
 
-    // Start/Options for pause toggle
-    if (startButton && !lastButtonStates.start) {
-        if (gameState === 'PLAYING') {
+        if (startPressed) {
             togglePause();
         }
     }
-    
-    // Update last states
-    lastButtonStates.a = aButton;
-    lastButtonStates.b = bButton;
-    lastButtonStates.x = xButton;
-    lastButtonStates.y = yButton;
-    lastButtonStates.start = startButton;
+
+    state.buttons[GAMEPAD_BUTTONS.A] = aButton;
+    state.buttons[GAMEPAD_BUTTONS.B] = bButton;
+    state.buttons[GAMEPAD_BUTTONS.X] = xButton;
+    state.buttons[GAMEPAD_BUTTONS.Y] = yButton;
+    state.buttons[GAMEPAD_BUTTONS.START] = startButton;
+    state.buttons[GAMEPAD_BUTTONS.RT] = rtButton;
 }
 
 function updateMenuHighlight() {
