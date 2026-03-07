@@ -994,14 +994,15 @@ function addGamepadMovementInputGame2(moveInput, padIndex) {
   if (state.buttons[GAMEPAD_BUTTONS.DPAD_RIGHT]) moveInput.x -= 1;
 }
 
-function getGamepadRotateInput(padIndex) {
+function getGamepadRotateInput(padIndex, stick = 'right') {
   const state = getGamepadState(padIndex);
   if (!state || !state.connected) return 0;
   let rotate = 0;
   if (state.buttons[GAMEPAD_BUTTONS.LB]) rotate += 1;
   if (state.buttons[GAMEPAD_BUTTONS.RB]) rotate -= 1;
-  if (state.rightStick.x !== 0) {
-    rotate -= state.rightStick.x;
+  const stickX = stick === 'left' ? state.leftStick.x : state.rightStick.x;
+  if (stickX !== 0) {
+    rotate -= stickX;
   }
   rotate = THREE.MathUtils.clamp(rotate, -1, 1);
   return rotate;
@@ -4381,7 +4382,7 @@ function updateGame2(delta) {
     if (keys[game2GunnerControls.rotateLeft]) turretRotateInput += 1;
     if (keys[game2GunnerControls.rotateRight]) turretRotateInput -= 1;
     const gunnerPadIndex = players[1].gamepadIndex;
-    turretRotateInput += getGamepadRotateInput(gunnerPadIndex);
+    turretRotateInput += getGamepadRotateInput(gunnerPadIndex, 'left');
     turretRotateInput = THREE.MathUtils.clamp(turretRotateInput, -1, 1);
     if (turretRotateInput !== 0) {
       turretPivot.rotation.y += turretRotateInput * GAME2_TURRET_SPEED * delta;
